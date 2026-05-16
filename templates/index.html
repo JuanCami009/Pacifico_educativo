@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pacífico Educativo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+
+<!-- PANTALLA 1: BIENVENIDA / LOGIN -->
+<div id="screen-intro" class="screen active">
+  <div class="intro-content">
+    <div class="logo-emoji">🌿</div>
+    <h1 class="logo-titulo">Pacífico Educativo</h1>
+    <p class="logo-sub">Aprende con los mitos del litoral colombiano</p>
+    <div class="card intro-card">
+      <label for="nombre-input">¿Cómo te llamas?</label>
+      <input id="nombre-input" type="text" placeholder="Escribe tu nombre aquí..." maxlength="30" autocomplete="off">
+      <button id="btn-entrar" class="btn btn-primary btn-grande">¡Entrar a la aventura! 🚀</button>
+      <p id="intro-error" class="error-msg hidden"></p>
+    </div>
+  </div>
+</div>
+
+<!-- PANTALLA 2: MENÚ DE MATERIAS -->
+<div id="screen-menu" class="screen">
+  <header class="app-header">
+    <div id="saludo-header" class="saludo">¡Hola!</div>
+    <button id="btn-puntajes" class="btn btn-outline btn-sm">📊 Mis Puntajes</button>
+  </header>
+  <p class="subtitulo-menu">¿Qué quieres aprender hoy?</p>
+  <div class="materias-grid" id="materias-grid"></div>
+</div>
+
+<!-- PANTALLA 3: SELECCIÓN DE NIVEL -->
+<div id="screen-level-select" class="screen">
+  <header class="app-header">
+    <button id="btn-volver-menu" class="btn btn-outline btn-sm">← Menú</button>
+    <div id="level-select-titulo" class="titulo-nivel"></div>
+    <div></div>
+  </header>
+  <div id="personaje-guia-banner" class="personaje-banner"></div>
+  <div class="niveles-camino" id="niveles-camino"></div>
+</div>
+
+<!-- PANTALLA 4: INTRO DEL PERSONAJE -->
+<div id="screen-personaje" class="screen">
+  <div class="personaje-intro-wrapper">
+    <div class="card personaje-card">
+      <div id="pers-emoji" class="personaje-emoji-grande"></div>
+      <h2 id="pers-nombre" class="personaje-nombre"></h2>
+      <p id="pers-nivel" class="personaje-nivel-label"></p>
+      <blockquote id="pers-frase" class="personaje-frase"></blockquote>
+      <button id="btn-jugar" class="btn btn-primary btn-grande">¡Jugar! 🎮</button>
+      <button id="btn-volver-level" class="btn btn-ghost btn-sm">← Volver</button>
+    </div>
+  </div>
+</div>
+
+<!-- PANTALLA 5: MINIJUEGO ACTIVO -->
+<div id="screen-minijuego" class="screen">
+  <div class="minijuego-header">
+    <button id="btn-salir-juego" class="btn btn-ghost btn-sm">✕ Salir</button>
+    <p id="instruccion-texto" class="instruccion"></p>
+    <div class="puntaje-badge">
+      <span>⭐</span><span id="puntaje-display">100</span>
+    </div>
+  </div>
+  <div id="game-area"></div>
+</div>
+
+<!-- PANTALLA 6: RESULTADO -->
+<div id="screen-resultado" class="screen">
+  <div class="resultado-wrapper">
+    <div class="card resultado-card">
+      <div id="resultado-emoji" class="resultado-emoji">🎉</div>
+      <h2 id="resultado-titulo">¡Excelente!</h2>
+      <p id="resultado-sub" class="resultado-sub"></p>
+      <div class="puntaje-resultado" id="puntaje-resultado-display"></div>
+      <div class="resultado-estrellas" id="resultado-estrellas"></div>
+      <button id="btn-siguiente-nivel" class="btn btn-primary btn-grande">Siguiente nivel ➡</button>
+      <button id="btn-volver-mapa" class="btn btn-ghost">← Volver al mapa</button>
+    </div>
+  </div>
+</div>
+
+<!-- PANTALLA 7: TABLA DE PUNTAJES -->
+<div id="screen-puntajes" class="screen">
+  <header class="app-header">
+    <button id="btn-volver-menu-scores" class="btn btn-outline btn-sm">← Menú</button>
+    <h2 class="titulo-puntajes">📖 Diario de Viaje</h2>
+    <div></div>
+  </header>
+  <div id="tabla-puntajes" class="tabla-puntajes-container"></div>
+</div>
+
+<script src="/static/js/point_and_click.js"></script>
+<script src="/static/js/drag_and_drop.js"></script>
+<script src="/static/js/puzzle.js"></script>
+<script src="/static/js/atrapa_ranas.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>
