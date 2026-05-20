@@ -258,8 +258,16 @@
       const maxIns = 5; 
       if (insectos.length >= maxIns) return;
       
-      // Probabilidad balanceada para que el número correcto aparezca seguido
-      const esCorrecto = Math.random() < 0.35;
+      const hayCorrecto = insectos.some(inv => inv.n === numeroPedido && !inv.escapando && !inv.atrapado);
+      
+      let esCorrecto = false;
+      if (!hayCorrecto) {
+        esCorrecto = true;
+      } else {
+        // Probabilidad balanceada para que el número correcto aparezca seguido
+        esCorrecto = Math.random() < 0.35;
+      }
+      
       const n = esCorrecto ? numeroPedido : (1 + Math.floor(Math.random() * 9));
       
       insectos.push(crearInsecto(n));
