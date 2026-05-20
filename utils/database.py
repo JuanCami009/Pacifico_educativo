@@ -8,8 +8,16 @@ import os
 from datetime import datetime
 
 
-# Ruta de la base de datos relativa al directorio del proyecto
-RUTA_DB = os.path.join(os.path.dirname(__file__), '..', 'data', 'progress.db')
+def _obtener_ruta_db() -> str:
+    """Devuelve una ruta de base de datos válida para local y Vercel."""
+    ruta_personalizada = os.getenv("DATABASE_PATH")
+    if ruta_personalizada:
+        return ruta_personalizada
+
+    if os.getenv("VERCEL"):
+        return "/tmp/progress.db"
+
+    return os.path.join(os.path.dirname(__file__), '..', 'data', 'progress.db')
 
 
 def obtener_conexion():
@@ -18,10 +26,11 @@ def obtener_conexion():
     Crea el directorio /data si no existe.
     """
     # Asegurar que el directorio de datos existe
-    directorio = os.path.dirname(RUTA_DB)
+    ruta_db = _obtener_ruta_db()
+    directorio = os.path.dirname(ruta_db)
     os.makedirs(directorio, exist_ok=True)
 
-    conexion = sqlite3.connect(RUTA_DB)
+    conexion = sqlite3.connect(ruta_db)
     # Devolver filas como diccionarios para mayor comodidad
     conexion.row_factory = sqlite3.Row
     return conexion
