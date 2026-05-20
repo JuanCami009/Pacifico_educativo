@@ -33,14 +33,19 @@ class MotorDragDrop {
 
   _render() {
     this.area.innerHTML = '';
-    this.area.style.flexDirection = 'row';
-    this.area.style.alignItems = 'flex-start';
-    this.area.style.gap = '24px';
+    
+    // Contenedor principal del tablero de arrastre (usa estilos definidos en styles.css)
+    const board = document.createElement('div');
+    board.className = 'drag-board';
 
     // Columna de piezas (izquierda)
     const colPiezas = document.createElement('div');
-    colPiezas.style.cssText = 'display:flex;flex-direction:column;gap:12px;flex:1;align-items:center;';
-    colPiezas.innerHTML = '<strong style="opacity:0.7;font-size:0.85rem">ARRASTRA ➜</strong>';
+    colPiezas.className = 'panel-piezas';
+    
+    const tituloPiezas = document.createElement('div');
+    tituloPiezas.className = 'panel-titulo';
+    tituloPiezas.textContent = 'Elementos';
+    colPiezas.appendChild(tituloPiezas);
 
     const mezcladas = [...this.piezas].sort(() => Math.random() - 0.5);
     mezcladas.forEach(pieza => {
@@ -50,16 +55,21 @@ class MotorDragDrop {
 
     // Columna de zonas (derecha)
     const colZonas = document.createElement('div');
-    colZonas.style.cssText = 'display:flex;flex-direction:column;gap:12px;flex:1;align-items:center;';
-    colZonas.innerHTML = '<strong style="opacity:0.7;font-size:0.85rem">ZONAS DESTINO</strong>';
+    colZonas.className = 'panel-zonas';
+    
+    const tituloZonas = document.createElement('div');
+    tituloZonas.className = 'panel-titulo';
+    tituloZonas.textContent = 'Destinos';
+    colZonas.appendChild(tituloZonas);
 
     this.zonas.forEach(zona => {
       const el = this._crearZona(zona);
       colZonas.appendChild(el);
     });
 
-    this.area.appendChild(colPiezas);
-    this.area.appendChild(colZonas);
+    board.appendChild(colPiezas);
+    board.appendChild(colZonas);
+    this.area.appendChild(board);
   }
 
   _crearPieza(pieza) {
@@ -69,8 +79,15 @@ class MotorDragDrop {
     el.dataset.id = pieza.nombre;
     el.dataset.destino = pieza.zona_destino;
 
-    const emoji = this._emoji(pieza.nombre);
-    el.innerHTML = `${emoji} ${pieza.nombre}`;
+    // Crear icono con FontAwesome en vez de emojis
+    const icon = document.createElement('div');
+    icon.className = 'pieza-drag-icon';
+    icon.innerHTML = `<i class="${this._iconPorNombre(pieza.nombre)}"></i>`;
+    el.appendChild(icon);
+
+    const text = document.createElement('span');
+    text.textContent = pieza.nombre;
+    el.appendChild(text);
 
     el.addEventListener('dragstart', e => {
       this.arrastrandoId = pieza.zona_destino;
@@ -87,7 +104,16 @@ class MotorDragDrop {
     const el = document.createElement('div');
     el.className = 'zona-drop';
     el.dataset.id = zona.id;
-    el.innerHTML = `<span style="opacity:0.6;font-size:0.8rem">Suelta aquí</span><br><strong>${zona.etiqueta}</strong>`;
+    
+    const indicator = document.createElement('span');
+    indicator.className = 'zona-drop-indicator';
+    indicator.textContent = 'Arrastra aquí';
+    el.appendChild(indicator);
+
+    const label = document.createElement('strong');
+    label.className = 'zona-drop-label';
+    label.textContent = zona.etiqueta;
+    el.appendChild(label);
 
     el.addEventListener('dragover', e => {
       e.preventDefault();
@@ -111,13 +137,16 @@ class MotorDragDrop {
       // Correcto
       zona.ocupada = true;
       elZona.classList.add('completada');
-      elZona.innerHTML = `<span style="font-size:1.5rem">✅</span><br><strong>${zona.etiqueta}</strong>`;
+      elZona.innerHTML = `
+        <span style="font-size:1.5rem; color:#4CAF50; margin-bottom:6px;"><i class="fa-solid fa-circle-check"></i></span>
+        <strong class="zona-drop-label">${zona.etiqueta}</strong>
+      `;
       this.colocadas++;
 
       // Desactivar pieza correspondiente
       document.querySelectorAll('.pieza-drag').forEach(p => {
         if (p.dataset.destino === zona.id) {
-          p.style.opacity = '0.4';
+          p.style.opacity = '0.3';
           p.draggable = false;
         }
       });
@@ -130,7 +159,11 @@ class MotorDragDrop {
       this.puntaje -= 10;
       this.onPuntaje(this.puntaje);
       elZona.style.borderColor = '#f44336';
-      setTimeout(() => { elZona.style.borderColor = ''; }, 500);
+      elZona.style.boxShadow = '0 0 20px rgba(244, 67, 54, 0.4)';
+      setTimeout(() => { 
+        elZona.style.borderColor = ''; 
+        elZona.style.boxShadow = '';
+      }, 500);
     }
   }
 
@@ -140,9 +173,41 @@ class MotorDragDrop {
     }));
   }
 
-  _emoji(nombre) {
-    const m = { pez:'🐟', mono:'🐒', ballena:'🐋', canoa:'🛶', pez_rojo:'🐠',
-                rana:'🐸', hoja:'🍃', palma:'🌴', insecto:'🐛', sol:'☀️' };
-    return m[nombre] || '📦';
+  /** Devuelve una clase de FontAwesome representativa según el nombre del elemento */
+  _iconPorNombre(nombre) {
+    const mapa = {
+      // Peces
+      '3 peces': 'fa-solid fa-fish',
+      '5 peces': 'fa-solid fa-fish',
+      '2 peces': 'fa-solid fa-fish',
+      '4 peces': 'fa-solid fa-fish',
+      pez: 'fa-solid fa-fish',
+      mono: 'fa-solid fa-paw',
+      ballena: 'fa-solid fa-water',
+      
+      // Biología
+      rana: 'fa-solid fa-frog',
+      hoja: 'fa-solid fa-leaf',
+      palma: 'fa-solid fa-tree',
+      
+      // Letras / Sílabas
+      rim: 'fa-solid fa-font',
+      ta: 'fa-solid fa-font',
+      glar: 'fa-solid fa-font',
+    };
+
+    const normalized = nombre.toLowerCase().trim();
+    if (mapa[normalized]) return mapa[normalized];
+
+    // Fallbacks
+    if (normalized.includes('peces') || normalized.includes('pez') || normalized.includes('fish')) return 'fa-solid fa-fish';
+    if (normalized.includes('rana') || normalized.includes('frog')) return 'fa-solid fa-frog';
+    if (normalized.includes('hoja') || normalized.includes('planta') || normalized.includes('rama') || normalized.includes('leaf')) return 'fa-solid fa-leaf';
+    if (normalized.includes('palma') || normalized.includes('árbol') || normalized.includes('arbol') || normalized.includes('tree')) return 'fa-solid fa-tree';
+    
+    // Si es una sílaba corta (2-4 letras)
+    if (normalized.length <= 4) return 'fa-solid fa-font';
+
+    return 'fa-solid fa-circle-question';
   }
 }

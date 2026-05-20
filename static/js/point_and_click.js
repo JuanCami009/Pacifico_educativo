@@ -31,18 +31,14 @@ class MotorPointClick {
       el.className = 'game-item';
       el.dataset.correcto = item.es_correcto;
 
-      // Intentar mostrar imagen; si falla, usar emoji/texto
-      const emoji = this._emojiPorNombre(item.nombre);
-      if (item.imagen) {
-        const img = document.createElement('img');
-        img.src = item.imagen;
-        img.alt = item.nombre;
-        img.style.cssText = 'width:70px;height:70px;object-fit:contain;border-radius:8px;';
-        img.onerror = () => { img.replaceWith(document.createTextNode(emoji)); };
-        el.appendChild(img);
-      } else {
-        el.textContent = emoji;
-      }
+      // Icon wrapper con FontAwesome en lugar de emojis o imágenes rotas
+      const iconWrapper = document.createElement('div');
+      iconWrapper.className = 'game-item-icon-wrapper';
+      
+      const icon = document.createElement('i');
+      icon.className = this._iconPorNombre(item.nombre);
+      iconWrapper.appendChild(icon);
+      el.appendChild(iconWrapper);
 
       const label = document.createElement('div');
       label.className = 'game-item-label';
@@ -63,6 +59,12 @@ class MotorPointClick {
       el.style.pointerEvents = 'none';
       this.encontrados++;
 
+      // Agregar badge de acierto con FontAwesome check
+      const badge = document.createElement('div');
+      badge.className = 'game-item-feedback-badge correcto';
+      badge.innerHTML = '<i class="fa-solid fa-check"></i>';
+      el.appendChild(badge);
+
       if (this.encontrados >= this.totalCorrectos) {
         setTimeout(() => this._completar(), 600);
       }
@@ -71,7 +73,18 @@ class MotorPointClick {
       el.classList.add('error');
       this.puntaje -= 10;
       this.onPuntaje(this.puntaje);
-      setTimeout(() => el.classList.remove('error'), 500);
+
+      // Agregar badge de error con FontAwesome xmark
+      const badge = document.createElement('div');
+      badge.className = 'game-item-feedback-badge error';
+      badge.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+      el.appendChild(badge);
+
+      setTimeout(() => {
+        el.classList.remove('error');
+        el.style.pointerEvents = 'none';
+        el.style.opacity = '0.5';
+      }, 500);
     }
   }
 
@@ -82,17 +95,71 @@ class MotorPointClick {
     }));
   }
 
-  /** Devuelve un emoji representativo según el nombre del item */
-  _emojiPorNombre(nombre) {
+  /** Devuelve una clase de FontAwesome representativa según el nombre del item */
+  _iconPorNombre(nombre) {
     const mapa = {
-      cangrejo:'🦀', pez:'🐟', pez_azul:'🐟', pez_rojo:'🐠',
-      rana:'🐸', piedra:'🪨', hoja:'🍃', arbol:'🌳', agua:'💧',
-      ave:'🦜', mono:'🐒', ballena:'🐋', palma:'🌴', flor:'🌸',
-      flor_roja:'🌺', mariposa_azul:'🦋', rana_verde:'🐸',
-      reciclar:'♻️', sembrar_arbol:'🌱', basura_rio:'🗑️', talar_arbol:'🪓',
-      canoa:'🛶', barco_metal:'🚢', submarino:'🤿',
-      sol:'☀️', insecto:'🐛',
+      // Animales/Flora
+      cangrejo: 'fa-solid fa-shrimp',
+      pez: 'fa-solid fa-fish',
+      pez_azul: 'fa-solid fa-fish',
+      pez_rojo: 'fa-solid fa-fish',
+      rana: 'fa-solid fa-frog',
+      rana_verde: 'fa-solid fa-frog',
+      ave: 'fa-solid fa-crow',
+      mono: 'fa-solid fa-paw',
+      ballena: 'fa-solid fa-water',
+      insecto: 'fa-solid fa-bug',
+      sol: 'fa-solid fa-sun',
+      hoja: 'fa-solid fa-leaf',
+      palma: 'fa-solid fa-tree',
+      arbol: 'fa-solid fa-tree',
+      flor: 'fa-solid fa-seedling',
+      flor_roja: 'fa-solid fa-seedling',
+      mariposa_azul: 'fa-solid fa-bugs',
+      
+      // Objetos/Elementos
+      piedra: 'fa-solid fa-circle',
+      agua: 'fa-solid fa-droplet',
+      reciclar: 'fa-solid fa-recycle',
+      sembrar_arbol: 'fa-solid fa-seedling',
+      basura_rio: 'fa-solid fa-trash-can',
+      talar_arbol: 'fa-solid fa-scissors',
+      canoa: 'fa-solid fa-ship',
+      barco_metal: 'fa-solid fa-ship',
+      submarino: 'fa-solid fa-compass',
+      
+      // English Counting
+      'three frogs': 'fa-solid fa-frog',
+      'two frogs': 'fa-solid fa-frog',
+      'four frogs': 'fa-solid fa-frog',
+      '3ranas': 'fa-solid fa-frog',
+      '3ranas_b': 'fa-solid fa-frog',
+      '2ranas': 'fa-solid fa-frog',
+      '4ranas': 'fa-solid fa-frog',
+      
+      // Backgrounds
+      river: 'fa-solid fa-water',
+      mountain: 'fa-solid fa-mountain',
+      sky: 'fa-solid fa-cloud',
+      rio_1: 'fa-solid fa-water',
+      rio_2: 'fa-solid fa-water',
+      montana: 'fa-solid fa-mountain',
+      cielo: 'fa-solid fa-cloud',
     };
-    return mapa[nombre] || '❓';
+
+    const normalized = nombre.toLowerCase().trim();
+    if (mapa[normalized]) return mapa[normalized];
+    
+    // Fallbacks genéricos
+    if (normalized.includes('pez') || normalized.includes('fish')) return 'fa-solid fa-fish';
+    if (normalized.includes('rana') || normalized.includes('frog')) return 'fa-solid fa-frog';
+    if (normalized.includes('árbol') || normalized.includes('arbol') || normalized.includes('tree')) return 'fa-solid fa-tree';
+    if (normalized.includes('agua') || normalized.includes('río') || normalized.includes('rio') || normalized.includes('river')) return 'fa-solid fa-droplet';
+    if (normalized.includes('basura') || normalized.includes('trash')) return 'fa-solid fa-trash-can';
+    if (normalized.includes('canoa') || normalized.includes('barco') || normalized.includes('bote') || normalized.includes('boat')) return 'fa-solid fa-ship';
+    if (normalized.includes('flor') || normalized.includes('sembrar') || normalized.includes('planta') || normalized.includes('flower')) return 'fa-solid fa-seedling';
+    if (normalized.includes('mariposa') || normalized.includes('butterfly')) return 'fa-solid fa-bugs';
+    
+    return 'fa-solid fa-circle-question';
   }
 }

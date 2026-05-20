@@ -17,21 +17,21 @@ const Estado = {
 
 // ── Datos de materias ────────────────────────────────────────────────────────
 const MATERIAS = [
-  { clave: 'matematicas', nombre: 'Matemáticas', emoji: '🛶', personaje: 'El Riviel',
+  { clave: 'matematicas', nombre: 'Matemáticas', icon: 'fa-solid fa-calculator', personaje: 'El Riviel',
     grad: 'linear-gradient(135deg,#2E7D32,#1B5E20)' },
-  { clave: 'lenguaje',    nombre: 'Lenguaje',    emoji: '🍃', personaje: 'La Tunda',
+  { clave: 'lenguaje',    nombre: 'Lenguaje',    icon: 'fa-solid fa-book', personaje: 'La Tunda',
     grad: 'linear-gradient(135deg,#BF360C,#E65100)' },
-  { clave: 'ingles',      nombre: 'Inglés',       emoji: '⭐', personaje: 'El Duende',
+  { clave: 'ingles',      nombre: 'Inglés',       icon: 'fa-solid fa-language', personaje: 'El Duende',
     grad: 'linear-gradient(135deg,#0D47A1,#1565C0)' },
-  { clave: 'biologia',   nombre: 'Biología',     emoji: '🌿', personaje: 'La Madre de Agua',
+  { clave: 'biologia',   nombre: 'Biología',     icon: 'fa-solid fa-dna', personaje: 'La Madre de Agua',
     grad: 'linear-gradient(135deg,#00695C,#004D40)' },
 ];
 
 const PERSONAJES = {
-  matematicas: { nombre: 'El Riviel',       emoji: '🕯️',  color: '#42A5F5' },
-  lenguaje:    { nombre: 'La Tunda',        emoji: '🌿',  color: '#66BB6A' },
-  ingles:      { nombre: 'El Duende',       emoji: '🎩',  color: '#CE93D8' },
-  biologia:    { nombre: 'La Madre de Agua',emoji: '💧',  color: '#4DD0E1' },
+  matematicas: { nombre: 'El Riviel',       icon: 'fa-solid fa-fire',  color: '#42A5F5' },
+  lenguaje:    { nombre: 'La Tunda',        icon: 'fa-solid fa-leaf',  color: '#66BB6A' },
+  ingles:      { nombre: 'El Duende',       icon: 'fa-solid fa-hat-wizard',  color: '#CE93D8' },
+  biologia:    { nombre: 'La Madre de Agua',icon: 'fa-solid fa-droplet',  color: '#4DD0E1' },
 };
 
 const NOMBRES_NIVEL = [
@@ -144,8 +144,8 @@ function seleccionarMateria(clave) {
   // Encabezado
   document.getElementById('level-select-titulo').textContent = mat.nombre;
   document.getElementById('personaje-guia-banner').innerHTML =
-    `<span style="font-size:2rem">${per.emoji}</span>
-     <div><strong>${per.nombre}</strong> te acompaña en esta aventura</div>`;
+    `<span style="font-size:2rem"><i class="${per.icon}" style="color:${per.color}"></i></span>
+     <div style="margin-left:12px;"><strong>${per.nombre}</strong> te acompaña en esta aventura</div>`;
 
   // Círculos de nivel
   const camino = document.getElementById('niveles-camino');
@@ -163,8 +163,8 @@ function seleccionarMateria(clave) {
     const clase = completado ? 'completado' : (disponible ? 'disponible' : (desbloq ? 'disponible' : 'bloqueado'));
     circulo.className = `nivel-circulo ${clase}`;
     circulo.innerHTML = completado
-      ? `⭐<br><small style="font-size:0.6rem">${puntaje}pts</small>`
-      : (desbloq ? `${i}` : '🔒');
+      ? `<i class="fa-solid fa-star" style="color:#FFD700;"></i><br><small style="font-size:0.6rem; font-weight:800;">${puntaje}pts</small>`
+      : (desbloq ? `${i}` : '<i class="fa-solid fa-lock" style="opacity:0.5;"></i>');
 
     if (desbloq) {
       circulo.style.cursor = 'pointer';
@@ -206,7 +206,7 @@ async function mostrarPersonaje(nivel) {
   Estado.nivelDatos = datos;
 
   const per = PERSONAJES[Estado.materiaActiva];
-  document.getElementById('pers-emoji').textContent  = per.emoji;
+  document.getElementById('pers-emoji').innerHTML = `<i class="${per.icon}" style="color:${per.color}; font-size:4.5rem; text-shadow:0 0 20px rgba(255,255,255,0.2)"></i>`;
   document.getElementById('pers-nombre').textContent = datos.personaje || per.nombre;
   document.getElementById('pers-nivel').textContent  = `Nivel ${nivel}: ${NOMBRES_NIVEL[nivel-1]}`;
   document.getElementById('pers-frase').textContent  = datos.frase_intro || '¡Adelante, aventurero!';
@@ -230,6 +230,7 @@ async function iniciarMinijuego() {
     Estado.destruirMinijuego = null;
   }
 
+  screenMg.setAttribute('data-materia', Estado.materiaActiva);
   screenMg.classList.toggle('modo-atrapa-ranas', minijuego === 'atrapa_ranas');
 
   if (minijuego === 'atrapa_ranas') {
@@ -295,14 +296,24 @@ async function manejarNivelCompletado(puntaje) {
   await cargarProgreso();
 
   // Estrellas según puntaje
-  const estrellas = pts >= 90 ? '⭐⭐⭐' : pts >= 60 ? '⭐⭐' : '⭐';
-  const titulo    = pts >= 90 ? '¡Increíble!' : pts >= 60 ? '¡Muy bien!' : '¡Buen intento!';
+  let estrellasHtml = '';
+  const numEstrellas = pts >= 90 ? 3 : (pts >= 60 ? 2 : 1);
+  for (let i = 0; i < 3; i++) {
+    if (i < numEstrellas) {
+      estrellasHtml += '<i class="fa-solid fa-star" style="color:#FFD700; margin:0 4px;"></i>';
+    } else {
+      estrellasHtml += '<i class="fa-regular fa-star" style="color:rgba(255,255,255,0.25); margin:0 4px;"></i>';
+    }
+  }
+  const titulo    = pts >= 90 ? '¡Increíble!' : (pts >= 60 ? '¡Muy bien!' : '¡Buen intento!');
 
-  document.getElementById('resultado-emoji').textContent         = pts >= 60 ? '🎉' : '💪';
+  document.getElementById('resultado-emoji').innerHTML = pts >= 60
+    ? '<i class="fa-solid fa-trophy" style="color:#FFD700;"></i>'
+    : '<i class="fa-solid fa-award" style="color:#FFD700;"></i>';
   document.getElementById('resultado-titulo').textContent        = titulo;
   document.getElementById('resultado-sub').textContent           = `Nivel ${Estado.nivelActivo}: ${NOMBRES_NIVEL[Estado.nivelActivo-1]}`;
   document.getElementById('puntaje-resultado-display').textContent = `${pts} pts`;
-  document.getElementById('resultado-estrellas').textContent     = estrellas;
+  document.getElementById('resultado-estrellas').innerHTML     = estrellasHtml;
 
   // Botón siguiente nivel
   const hayMas = Estado.nivelActivo < 5;
@@ -338,7 +349,7 @@ async function mostrarPuntajes() {
             `<td>${pts > 0 ? `<span class="pts-badge">${pts}</span>` : '<span class="pts-vacio">—</span>'}</td>`
           ).join('');
           return `<tr>
-            <td>${mat.emoji} ${mat.nombre}</td>
+            <td><i class="${mat.icon}" style="margin-right:8px;"></i> ${mat.nombre}</td>
             ${celdas}
             <td><strong>${total}</strong></td>
           </tr>`;
