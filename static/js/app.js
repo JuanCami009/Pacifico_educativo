@@ -68,6 +68,17 @@ function actualizarFondo(clase) {
   document.body.classList.add(clase);
 }
 
+/**
+ * Cierra la pantalla de chat y vuelve a la intro del personaje.
+ */
+function cerrarChat() {
+  if (Estado.materiaActiva) {
+    mostrarPersonaje(Estado.nivelActivo);
+  } else {
+    mostrarMenu();
+  }
+}
+
 // ── Helpers de API ───────────────────────────────────────────────────────────
 async function api(metodo, ruta, cuerpo) {
   const ops = { method: metodo, headers: { 'Content-Type': 'application/json' } };
@@ -224,6 +235,7 @@ async function iniciarMinijuego() {
   const area = document.getElementById('game-area');
   const minijuego = datos.minijuego;
   const screenMg = document.getElementById('screen-minijuego');
+  const pistaBox = document.getElementById('ia-pista-box');
 
   if (typeof Estado.destruirMinijuego === 'function') {
     Estado.destruirMinijuego();
@@ -232,6 +244,10 @@ async function iniciarMinijuego() {
 
   screenMg.setAttribute('data-materia', Estado.materiaActiva);
   screenMg.classList.toggle('modo-atrapa-ranas', minijuego === 'atrapa_ranas');
+  if (pistaBox) {
+    pistaBox.classList.add('hidden');
+    pistaBox.textContent = '';
+  }
 
   if (minijuego === 'atrapa_ranas') {
     document.getElementById('instruccion-texto').textContent = datos.instruccion || '';
@@ -280,6 +296,36 @@ document.getElementById('btn-salir-juego').addEventListener('click', () => {
   seleccionarMateria(Estado.materiaActiva);
 });
 
+document.getElementById('btn-pedir-pista').addEventListener('click', pedirPistaIA);
+
+async function pedirPistaIA() {
+  const btn = document.getElementById('btn-pedir-pista');
+  const box = document.getElementById('ia-pista-box');
+  if (!Estado.nivelDatos || !box || !btn) return;
+
+  const perName = PERSONAJES[Estado.materiaActiva]?.nombre || Estado.nivelDatos.personaje || '';
+  box.classList.remove('hidden');
+  box.innerHTML = '<i class="fa-solid fa-lightbulb"></i> Pensando una pista corta...';
+  btn.disabled = true;
+
+  try {
+    const datos = await api('POST', '/api/ia/pista', {
+      materia: Estado.materiaActiva,
+      nivel: Estado.nivelActivo,
+      personaje: perName,
+      instruccion: Estado.nivelDatos.instruccion || '',
+      minijuego: Estado.nivelDatos.minijuego || '',
+    });
+    const texto = datos.respuesta || 'Lee la instrucción con calma y prueba paso a paso.';
+    const fuente = datos.fuente === 'ollama' || datos.fuente === 'cache' ? 'IA local' : 'modo offline';
+    box.innerHTML = `<i class="fa-solid fa-lightbulb"></i><span>${texto}</span><small>${fuente}</small>`;
+  } catch (_) {
+    box.innerHTML = '<i class="fa-solid fa-lightbulb"></i><span>Lee la instrucción con calma y prueba paso a paso.</span><small>modo offline</small>';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // ── PANTALLA 6: Resultado ────────────────────────────────────────────────────
 async function manejarNivelCompletado(puntaje) {
   actualizarFondo('bg-victoria');
@@ -314,6 +360,10 @@ async function manejarNivelCompletado(puntaje) {
   document.getElementById('resultado-sub').textContent           = `Nivel ${Estado.nivelActivo}: ${NOMBRES_NIVEL[Estado.nivelActivo-1]}`;
   document.getElementById('puntaje-resultado-display').textContent = `${pts} pts`;
   document.getElementById('resultado-estrellas').innerHTML     = estrellasHtml;
+
+  // Retroalimentación IA (no bloquea la pantalla)
+  const perName = PERSONAJES[Estado.materiaActiva]?.nombre || '';
+  pedirRetroalimentacionIA(Estado.materiaActiva, Estado.nivelActivo, pts, perName);
 
   // Botón siguiente nivel
   const hayMas = Estado.nivelActivo < 5;

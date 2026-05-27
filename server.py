@@ -9,6 +9,8 @@ import re
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from flask import Flask, jsonify, request, render_template
+from utils.ollama_service import servicio_ia
+from data.ia_fallback import MATERIA_A_PERSONAJE
 from utils.database import (
     inicializar_base_de_datos,
     obtener_o_crear_estudiante,
@@ -26,6 +28,9 @@ app = Flask(__name__, static_folder="static", template_folder="templates")
 inicializar_base_de_datos()
 
 MATERIAS = ["matematicas", "lenguaje", "ingles", "biologia"]
+IA_NIVELES_HABILITADOS = {
+    materia: {1, 2, 3, 4, 5} for materia in MATERIAS
+}
 
 
 def _transformar_rutas(obj):
@@ -40,6 +45,46 @@ def _transformar_rutas(obj):
     if isinstance(obj, str):
         return obj.replace("assets/", "/static/")
     return obj
+
+
+def _leer_entero(valor, por_defecto=0):
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return por_defecto
+
+
+def _ia_habilitada_para_nivel(materia, nivel):
+    return nivel in IA_NIVELES_HABILITADOS.get(materia, set())
+
+
+def _obtener_contexto_ia_nivel(materia, nivel):
+    datos = obtener_datos_nivel_completo(materia, nivel)
+    if not datos:
+        return None
+
+    contexto = {
+        "materia": materia,
+        "nivel": nivel,
+        "nombre": datos.get("nombre", ""),
+        "personaje": datos.get("personaje", ""),
+        "minijuego": datos.get("minijuego", ""),
+        "modo": datos.get("modo", ""),
+        "instruccion": datos.get("instruccion", ""),
+        "frase_intro": datos.get("frase_intro", ""),
+    }
+
+    contenido = datos.get("datos")
+    if isinstance(contenido, dict):
+        contexto["conteos"] = {
+            "items": len(contenido.get("items", [])) if isinstance(contenido.get("items"), list) else 0,
+            "piezas": len(contenido.get("piezas", [])) if isinstance(contenido.get("piezas"), list) else 0,
+            "zonas": len(contenido.get("zonas", [])) if isinstance(contenido.get("zonas"), list) else 0,
+        }
+    elif isinstance(contenido, list):
+        contexto["conteos"] = {"items": len(contenido)}
+
+    return contexto
 
 
 # ── Ruta principal ───────────────────────────────────────────────────────────
@@ -125,6 +170,100 @@ def get_niveles_materia(materia):
         if n["materia"] == materia
     ]
     return jsonify(niveles)
+
+
+# ── API: IA Local (Ollama) ────────────────────────────────────────────────────
+
+@app.route("/api/ia/estado")
+def ia_estado():
+    """Verifica si el servicio de IA local (Ollama) está disponible."""
+    return jsonify(servicio_ia.estado())
+
+
+@app.route("/api/ia/chat", methods=["POST"])
+def ia_chat():
+    """Envía un mensaje al personaje IA y recibe una respuesta."""
+    datos = request.get_json(silent=True) or {}
+    mensaje = (datos.get("mensaje") or "").strip()
+    personaje = (datos.get("personaje") or "").strip()
+    materia = (datos.get("materia") or "").strip()
+    nivel = _leer_entero(datos.get("nivel", 0))
+
+    if not mensaje:
+        return jsonify({"error": "El mensaje es requerido"}), 400
+
+    # Si no se especificó personaje, inferirlo de la materia
+    if not personaje and materia:
+        personaje = MATERIA_A_PERSONAJE.get(materia, "")
+
+    contexto_nivel = _obtener_contexto_ia_nivel(materia, nivel) if _ia_habilitada_para_nivel(materia, nivel) else None
+
+    resultado = servicio_ia.generar_respuesta(
+        personaje=personaje,
+        mensaje=mensaje,
+        contexto_materia=materia,
+        contexto_nivel=nivel,
+        contexto_nivel_info=contexto_nivel,
+    )
+    return jsonify(resultado)
+
+
+@app.route("/api/ia/pista", methods=["POST"])
+def ia_pista():
+    """Genera una pista corta y contextual para el nivel actual."""
+    datos = request.get_json(silent=True) or {}
+    personaje = (datos.get("personaje") or "").strip()
+    materia = (datos.get("materia") or "").strip()
+    nivel = _leer_entero(datos.get("nivel", 0))
+    instruccion = (datos.get("instruccion") or "").strip()
+    minijuego = (datos.get("minijuego") or "").strip()
+
+    if not materia or not nivel:
+        return jsonify({
+            "respuesta": "Lee la instruccion con calma y prueba paso a paso.",
+            "fuente": "fallback",
+            "modelo": servicio_ia.modelo,
+            "disponible": False,
+            "error": "Materia y nivel son requeridos para una pista contextual.",
+        }), 400
+
+    if not personaje and materia:
+        personaje = MATERIA_A_PERSONAJE.get(materia, "")
+
+    contexto_nivel = _obtener_contexto_ia_nivel(materia, nivel) if _ia_habilitada_para_nivel(materia, nivel) else None
+    resultado = servicio_ia.generar_pista(
+        personaje=personaje,
+        materia=materia,
+        nivel=nivel,
+        instruccion=instruccion,
+        minijuego=minijuego,
+        contexto_nivel_info=contexto_nivel,
+    )
+    return jsonify(resultado)
+
+
+@app.route("/api/ia/retroalimentacion", methods=["POST"])
+def ia_retroalimentacion():
+    """Genera retroalimentación IA después de completar un nivel."""
+    datos = request.get_json(silent=True) or {}
+    personaje = (datos.get("personaje") or "").strip()
+    materia = (datos.get("materia") or "").strip()
+    nivel = _leer_entero(datos.get("nivel", 0))
+    puntaje = _leer_entero(datos.get("puntaje", 0))
+
+    if not personaje and materia:
+        personaje = MATERIA_A_PERSONAJE.get(materia, "")
+
+    contexto_nivel = _obtener_contexto_ia_nivel(materia, nivel) if _ia_habilitada_para_nivel(materia, nivel) else None
+
+    resultado = servicio_ia.generar_retroalimentacion(
+        personaje=personaje,
+        materia=materia,
+        nivel=nivel,
+        puntaje=puntaje,
+        contexto_nivel_info=contexto_nivel,
+    )
+    return jsonify(resultado)
 
 
 if __name__ == "__main__":

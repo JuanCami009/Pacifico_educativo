@@ -57,6 +57,7 @@
       <p id="pers-nivel" class="personaje-nivel-label"></p>
       <blockquote id="pers-frase" class="personaje-frase"></blockquote>
       <button id="btn-jugar" class="btn btn-primary btn-grande">¡Jugar! <i class="fa-solid fa-gamepad" style="margin-left: 4px;"></i></button>
+      <button id="btn-chat-personaje" class="btn btn-outline btn-grande" onclick="abrirChat()">💬 Hablar con el personaje</button>
       <button id="btn-volver-level" class="btn btn-ghost btn-sm">← Volver</button>
     </div>
   </div>
@@ -67,10 +68,14 @@
   <div class="minijuego-header">
     <button id="btn-salir-juego" class="btn btn-ghost btn-sm">✕ Salir</button>
     <p id="instruccion-texto" class="instruccion"></p>
+    <button id="btn-pedir-pista" class="btn btn-outline btn-sm btn-pista">
+      <i class="fa-solid fa-lightbulb"></i> Pista
+    </button>
     <div class="puntaje-badge">
       <span><i class="fa-solid fa-star" style="color: #FFD700; margin-right: 4px;"></i></span><span id="puntaje-display">100</span>
     </div>
   </div>
+  <div id="ia-pista-box" class="ia-pista-box hidden"></div>
   <div id="game-area"></div>
 </div>
 
@@ -83,6 +88,8 @@
       <p id="resultado-sub" class="resultado-sub"></p>
       <div class="puntaje-resultado" id="puntaje-resultado-display"></div>
       <div class="resultado-estrellas" id="resultado-estrellas"></div>
+      <!-- Retroalimentación IA (se rellena dinámicamente) -->
+      <div id="ia-retroalimentacion-box" class="ia-retro-box hidden"></div>
       <button id="btn-siguiente-nivel" class="btn btn-primary btn-grande">Siguiente nivel <i class="fa-solid fa-arrow-right" style="margin-left: 4px;"></i></button>
       <button id="btn-volver-mapa" class="btn btn-ghost">← Volver al mapa</button>
     </div>
@@ -99,10 +106,45 @@
   <div id="tabla-puntajes" class="tabla-puntajes-container"></div>
 </div>
 
+
+<!-- PANTALLA 8: CHAT CON PERSONAJE IA -->
+<div id="screen-ia-chat" class="screen">
+  <div class="chat-wrapper">
+    <!-- Cabecera del chat -->
+    <div class="chat-cabecera card">
+      <button id="btn-cerrar-chat" class="btn btn-ghost btn-sm" onclick="cerrarChat()">← Volver</button>
+      <div class="chat-cabecera-centro">
+        <i id="chat-personaje-icon" class="fa-solid fa-fire" style="color:#42A5F5;font-size:1.5rem;"></i>
+        <span id="chat-personaje-nombre" class="chat-nombre-personaje">El Riviel</span>
+      </div>
+      <span id="ia-estado-badge" class="ia-badge ia-badge-offline">🟡 Cargando...</span>
+    </div>
+    <!-- Área de mensajes -->
+    <div id="chat-mensajes" class="chat-mensajes card"></div>
+    <!-- Botones rápidos -->
+    <div id="chat-acciones-rapidas" class="chat-acciones-rapidas"></div>
+    <!-- Input de mensaje -->
+    <div class="chat-input-row card">
+      <input
+        id="chat-input"
+        type="text"
+        placeholder="Escríbele al personaje..."
+        maxlength="200"
+        autocomplete="off"
+        onkeydown="if(event.key==='Enter') enviarMensajeChat()"
+      >
+      <button id="chat-btn-enviar" class="btn btn-primary chat-btn-enviar" onclick="enviarMensajeChat()">
+        <i class="fa-solid fa-paper-plane"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
 <script src="/static/js/point_and_click.js?v=1.1"></script>
 <script src="/static/js/drag_and_drop.js?v=1.1"></script>
 <script src="/static/js/puzzle.js?v=1.1"></script>
 <script src="/static/js/atrapa_ranas.js?v=1.1"></script>
+<script src="/static/js/ia_chat.js?v=1.0"></script>
 <script src="/static/js/app.js?v=1.1"></script>
 </body>
 </html>
