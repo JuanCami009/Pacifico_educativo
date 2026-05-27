@@ -1525,3 +1525,81 @@ label { font-size: 1rem; opacity: 0.85; }
   border-color: var(--dorado) !important;
 }
 
+.btn-pista {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 50px !important;
+  background: rgba(255, 179, 0, 0.92) !important;
+  color: #3e2723 !important;
+  border-color: #fff8e1 !important;
+}
+
+.btn-pista:disabled {
+  opacity: 0.65;
+  cursor: wait;
+  transform: none !important;
+}
+
+.ia-pista-box {
+  position: absolute;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  width: min(92vw, 620px);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.72);
+  border: 2px solid var(--dorado);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-weight: 800;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.ia-pista-box i {
+  color: var(--dorado);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.ia-pista-box span {
+  flex: 1;
+}
+
+.ia-pista-box small,
+.chat-fuente,
+.chat-espera-texto {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.chat-fuente {
+  margin-left: 4px;
+}
+
+@media (max-width: 720px) {
+  .minijuego-header {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .btn-pista {
+    padding: 7px 10px !important;
+  }
+
+  .ia-pista-box {
+    top: 118px;
+    font-size: 0.9rem;
+  }
+}
+

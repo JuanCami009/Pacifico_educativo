@@ -1,107 +1,100 @@
 /**
- * ia_chat.js - Módulo de chat con personajes IA para Pacífico Educativo.
- * Gestiona la pantalla de chat, envío de mensajes a /api/ia/chat
- * y retroalimentación post-nivel vía /api/ia/retroalimentacion.
- * Usa el Estado global y sigue las convenciones del proyecto.
+ * ia_chat.js - Chat con personajes IA para Pacifico Educativo.
+ * Usa /api/ia/chat, /api/ia/estado y /api/ia/retroalimentacion.
  */
 
-// ── Estado local del chat ────────────────────────────────────────────────────
 const EstadoChat = {
-  personaje:    null,   // nombre del personaje activo en el chat
-  materia:      null,   // materia activa
-  nivel:        0,      // nivel activo
-  esperando:    false,  // true mientras espera respuesta de la IA
-  iaDisponible: null,   // null = no verificado; true/false tras verificación
+  personaje: null,
+  materia: null,
+  nivel: 0,
+  esperando: false,
+  iaDisponible: null,
+  modelo: null,
+  fuente: null,
 };
 
-// ── Iconos de personaje ──────────────────────────────────────────────────────
 const ICONOS_CHAT = {
   'El Riviel':        { icon: 'fa-solid fa-fire',       color: '#42A5F5' },
-  'La Tunda':         { icon: 'fa-solid fa-leaf',        color: '#66BB6A' },
+  'La Tunda':         { icon: 'fa-solid fa-leaf',       color: '#66BB6A' },
   'El Duende':        { icon: 'fa-solid fa-hat-wizard', color: '#CE93D8' },
   'La Madre de Agua': { icon: 'fa-solid fa-droplet',    color: '#4DD0E1' },
 };
 
-// ── Botones rápidos por personaje ────────────────────────────────────────────
 const BOTONES_RAPIDOS = {
   'El Riviel': [
-    { texto: '🔢 Hazme una pregunta', mensaje: 'Hazme una pregunta de matemáticas' },
-    { texto: '📖 Cuéntame una historia', mensaje: 'Cuéntame una historia del río' },
-    { texto: '💡 Necesito una pista', mensaje: 'Ayúdame con una pista del nivel' },
+    { texto: 'Hazme una pregunta', mensaje: 'Hazme una pregunta de matematicas' },
+    { texto: 'Cuentame una historia', mensaje: 'Cuentame una historia del rio' },
+    { texto: 'Necesito una pista', mensaje: 'Ayudame con una pista del nivel' },
   ],
   'La Tunda': [
-    { texto: '🔤 Hazme una pregunta', mensaje: 'Hazme una pregunta de lenguaje' },
-    { texto: '🌿 Cuéntame una historia', mensaje: 'Cuéntame una historia del bosque' },
-    { texto: '💡 Necesito ayuda', mensaje: 'Ayúdame con las palabras del nivel' },
+    { texto: 'Hazme una pregunta', mensaje: 'Hazme una pregunta de lenguaje' },
+    { texto: 'Cuentame una historia', mensaje: 'Cuentame una historia del bosque' },
+    { texto: 'Necesito ayuda', mensaje: 'Ayudame con las palabras del nivel' },
   ],
   'El Duende': [
-    { texto: '🇬🇧 Ask me a question', mensaje: 'Hazme una pregunta en inglés' },
-    { texto: '📚 Tell me a story', mensaje: 'Cuéntame una historia en inglés' },
-    { texto: '💡 I need help', mensaje: 'Help me with the English words' },
+    { texto: 'Ask me a question', mensaje: 'Hazme una pregunta en ingles' },
+    { texto: 'Tell me a story', mensaje: 'Cuentame una historia en ingles' },
+    { texto: 'I need help', mensaje: 'Help me with the English words' },
   ],
   'La Madre de Agua': [
-    { texto: '🌊 Hazme una pregunta', mensaje: 'Hazme una pregunta de biología' },
-    { texto: '🐋 Cuéntame una historia', mensaje: 'Cuéntame una historia del manglar' },
-    { texto: '💡 Necesito una pista', mensaje: 'Ayúdame con los seres vivos' },
+    { texto: 'Hazme una pregunta', mensaje: 'Hazme una pregunta de biologia' },
+    { texto: 'Cuentame una historia', mensaje: 'Cuentame una historia del manglar' },
+    { texto: 'Necesito una pista', mensaje: 'Ayudame con los seres vivos' },
   ],
 };
 
 const BOTONES_RAPIDOS_DEFECTO = [
-  { texto: '💬 Cuéntame algo', mensaje: 'Cuéntame algo interesante' },
-  { texto: '📖 Una historia', mensaje: 'Cuéntame una historia corta' },
-  { texto: '💡 Necesito ayuda', mensaje: 'Necesito ayuda con el nivel' },
+  { texto: 'Cuentame algo', mensaje: 'Cuentame algo interesante' },
+  { texto: 'Una historia', mensaje: 'Cuentame una historia corta' },
+  { texto: 'Necesito ayuda', mensaje: 'Necesito ayuda con el nivel' },
 ];
 
-// ── Verificar estado de la IA al cargar ───────────────────────────────────────
 async function verificarEstadoIA() {
   try {
     const res = await fetch('/api/ia/estado');
     const datos = await res.json();
     EstadoChat.iaDisponible = datos.disponible;
-    _actualizarBadgeIA(datos.disponible);
+    EstadoChat.modelo = datos.modelo || '';
+    EstadoChat.fuente = datos.fuente || (datos.disponible ? 'ollama' : 'fallback');
+    _actualizarBadgeIA(datos.disponible, EstadoChat.modelo);
   } catch (_) {
     EstadoChat.iaDisponible = false;
-    _actualizarBadgeIA(false);
+    EstadoChat.modelo = '';
+    EstadoChat.fuente = 'fallback';
+    _actualizarBadgeIA(false, '');
   }
 }
 
-function _actualizarBadgeIA(disponible) {
+function _actualizarBadgeIA(disponible, modelo) {
   const badge = document.getElementById('ia-estado-badge');
   if (!badge) return;
   if (disponible) {
-    badge.textContent = '🟢 IA activa';
+    badge.textContent = `IA local activa${modelo ? ` · ${modelo}` : ''}`;
     badge.classList.remove('ia-badge-offline');
     badge.classList.add('ia-badge-online');
   } else {
-    badge.textContent = '🟡 Modo sin conexión';
+    badge.textContent = modelo ? `Fallback offline · ${modelo}` : 'Fallback offline';
     badge.classList.remove('ia-badge-online');
     badge.classList.add('ia-badge-offline');
   }
 }
 
-// ── Abrir pantalla de chat ───────────────────────────────────────────────────
-/**
- * Abre la pantalla de chat con el personaje de la materia activa.
- * Se integra con el Estado global de app.js.
- */
 function abrirChat() {
-  const materia   = Estado.materiaActiva;
+  const materia = Estado.materiaActiva;
   const nivelDatos = Estado.nivelDatos;
-
-  // Determinar personaje: del nivel cargado o del mapa de materias
   const mapPersonaje = {
     matematicas: 'El Riviel',
-    lenguaje:    'La Tunda',
-    ingles:      'El Duende',
-    biologia:    'La Madre de Agua',
+    lenguaje: 'La Tunda',
+    ingles: 'El Duende',
+    biologia: 'La Madre de Agua',
   };
   const nombrePersonaje = (nivelDatos && nivelDatos.personaje)
     ? nivelDatos.personaje
     : (mapPersonaje[materia] || 'El Riviel');
 
   EstadoChat.personaje = nombrePersonaje;
-  EstadoChat.materia   = materia;
-  EstadoChat.nivel     = Estado.nivelActivo || 0;
+  EstadoChat.materia = materia;
+  EstadoChat.nivel = Estado.nivelActivo || 0;
 
   _renderizarCabeceraChat(nombrePersonaje);
   _renderizarBotonesRapidos(nombrePersonaje);
@@ -112,7 +105,6 @@ function abrirChat() {
   mostrarPantalla('screen-ia-chat');
   actualizarFondo(`bg-juego-${materia || 'matematicas'}`);
 
-  // Foco en el input
   setTimeout(() => {
     const inp = document.getElementById('chat-input');
     if (inp) inp.focus();
@@ -121,12 +113,12 @@ function abrirChat() {
 
 function _mensajeBienvenida(personaje) {
   const bienvenidas = {
-    'El Riviel':        '¡Hola, aventurero! Soy El Riviel 🌊 ¿En qué te puedo ayudar hoy?',
-    'La Tunda':         '¡Bienvenido, pequeño! Soy La Tunda 🌿 ¿Qué quieres saber?',
-    'El Duende':        '¡Hello, friend! Soy El Duende 🎩 ¡Pregúntame lo que quieras!',
-    'La Madre de Agua': '¡Bienvenido, guardián! Soy la Madre de Agua 💧 ¿Cómo puedo ayudarte?',
+    'El Riviel': 'Hola, aventurero. Soy El Riviel. ¿En que te puedo ayudar hoy?',
+    'La Tunda': 'Bienvenido, pequeno. Soy La Tunda. ¿Que quieres saber?',
+    'El Duende': 'Hello, friend. Soy El Duende. Preguntame lo que quieras.',
+    'La Madre de Agua': 'Bienvenido, guardian. Soy la Madre de Agua. ¿Como puedo ayudarte?',
   };
-  return bienvenidas[personaje] || '¡Hola! ¿En qué te puedo ayudar? 🌟';
+  return bienvenidas[personaje] || 'Hola. ¿En que te puedo ayudar?';
 }
 
 function _renderizarCabeceraChat(personaje) {
@@ -151,10 +143,6 @@ function _renderizarBotonesRapidos(personaje) {
   ).join('');
 }
 
-// ── Enviar mensajes ──────────────────────────────────────────────────────────
-/**
- * Envía el mensaje del input del chat al endpoint de la IA.
- */
 async function enviarMensajeChat() {
   if (EstadoChat.esperando) return;
 
@@ -167,10 +155,6 @@ async function enviarMensajeChat() {
   await _pedirRespuestaIA(texto);
 }
 
-/**
- * Envía un mensaje predefinido (botón rápido) al chat.
- * @param {string} mensaje - Texto del mensaje a enviar.
- */
 async function enviarMensajeRapido(mensaje) {
   if (EstadoChat.esperando) return;
   _agregarMensajeUsuario(mensaje);
@@ -187,27 +171,24 @@ async function _pedirRespuestaIA(mensaje) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        mensaje:   mensaje,
+        mensaje,
         personaje: EstadoChat.personaje,
-        materia:   EstadoChat.materia,
-        nivel:     EstadoChat.nivel,
+        materia: EstadoChat.materia,
+        nivel: EstadoChat.nivel,
       }),
     });
 
     _quitarEscribiendo(idEscribiendo);
-
     if (!res.ok) throw new Error('Error de red');
 
     const datos = await res.json();
-    if (datos.error) throw new Error(datos.error);
-
+    if (datos.modelo) _actualizarBadgeIA(datos.fuente === 'ollama' || datos.fuente === 'cache', datos.modelo);
     _agregarMensajePersonaje(datos.respuesta, datos.fuente);
-
   } catch (err) {
     _quitarEscribiendo(idEscribiendo);
     _agregarMensajePersonaje(
-      '¡Ups! No pude responder ahora mismo. ¡Intenta de nuevo! 😅',
-      'error'
+      'Estoy en modo offline, pero puedo ayudarte: lee la instruccion con calma y prueba paso a paso.',
+      'fallback'
     );
     console.warn('[Chat IA] Error:', err);
   } finally {
@@ -216,11 +197,6 @@ async function _pedirRespuestaIA(mensaje) {
   }
 }
 
-// ── Retroalimentación post-nivel ─────────────────────────────────────────────
-/**
- * Pide retroalimentación IA al terminar un nivel y la agrega a la
- * pantalla de resultado. Se llama desde manejarNivelCompletado en app.js.
- */
 async function pedirRetroalimentacionIA(materia, nivel, puntaje, personaje) {
   const contenedor = document.getElementById('ia-retroalimentacion-box');
   if (!contenedor) return;
@@ -239,7 +215,8 @@ async function pedirRetroalimentacionIA(materia, nivel, puntaje, personaje) {
       body: JSON.stringify({ personaje, materia, nivel, puntaje }),
     });
     const datos = await res.json();
-    const texto = datos.respuesta || '¡Buen trabajo! 🌟';
+    const texto = datos.respuesta || 'Buen trabajo. Sigue practicando paso a paso.';
+    if (datos.modelo) _actualizarBadgeIA(datos.fuente === 'ollama' || datos.fuente === 'cache', datos.modelo);
     const icData = ICONOS_CHAT[personaje] || { icon: 'fa-solid fa-robot', color: '#FFD700' };
     contenedor.innerHTML = `
       <div class="ia-retro-burbuja">
@@ -247,11 +224,13 @@ async function pedirRetroalimentacionIA(materia, nivel, puntaje, personaje) {
         <p class="ia-retro-texto">${_escaparHtml(texto)}</p>
       </div>`;
   } catch (_) {
-    contenedor.classList.add('hidden');
+    contenedor.innerHTML = `
+      <div class="ia-retro-burbuja">
+        <i class="fa-solid fa-robot" style="color:#FFD700;font-size:1.4rem;flex-shrink:0;"></i>
+        <p class="ia-retro-texto">Buen trabajo. Sigue practicando paso a paso.</p>
+      </div>`;
   }
 }
-
-// ── Helpers de UI ────────────────────────────────────────────────────────────
 
 function _limpiarMensajes() {
   const cont = document.getElementById('chat-mensajes');
@@ -273,6 +252,7 @@ function _agregarMensajePersonaje(texto, fuente = 'ia') {
   if (!cont) return;
   const personaje = EstadoChat.personaje || 'IA';
   const icData = ICONOS_CHAT[personaje] || { icon: 'fa-solid fa-robot', color: '#FFD700' };
+  const fuenteTxt = fuente === 'ollama' ? 'IA local' : (fuente === 'cache' ? 'IA local · cache' : (fuente === 'fallback' ? 'modo offline' : ''));
 
   const div = document.createElement('div');
   div.className = 'chat-burbuja chat-burbuja-personaje';
@@ -282,7 +262,8 @@ function _agregarMensajePersonaje(texto, fuente = 'ia') {
     </div>
     <div>
       <span class="chat-burbuja-nombre">${_escaparHtml(personaje)}</span>
-      <span class="chat-burbuja-texto">${_escaparHtml(texto)}</span>
+      <span class="chat-burbuja-texto">${_escaparHtml(texto || 'Lee la instruccion con calma y prueba paso a paso.')}</span>
+      ${fuenteTxt ? `<span class="chat-fuente">${fuenteTxt}</span>` : ''}
     </div>`;
   cont.appendChild(div);
   _scrollAbajo(cont);
@@ -301,8 +282,10 @@ function _mostrarEscribiendo() {
     <div class="chat-avatar">
       <i class="${icData.icon}" style="color:${icData.color};"></i>
     </div>
-    <div class="chat-puntos">
-      <span></span><span></span><span></span>
+    <div>
+      <span class="chat-burbuja-nombre">${_escaparHtml(personaje)}</span>
+      <div class="chat-puntos"><span></span><span></span><span></span></div>
+      <span class="chat-espera-texto">Pensando una respuesta corta...</span>
     </div>`;
   cont.appendChild(div);
   _scrollAbajo(cont);
@@ -323,9 +306,9 @@ function _scrollAbajo(contenedor) {
 
 function _deshabilitarInput(deshabilitar) {
   const input = document.getElementById('chat-input');
-  const btn   = document.getElementById('chat-btn-enviar');
+  const btn = document.getElementById('chat-btn-enviar');
   if (input) input.disabled = deshabilitar;
-  if (btn)   btn.disabled   = deshabilitar;
+  if (btn) btn.disabled = deshabilitar;
 }
 
 function _escaparHtml(texto) {
