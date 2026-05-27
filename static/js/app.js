@@ -68,6 +68,17 @@ function actualizarFondo(clase) {
   document.body.classList.add(clase);
 }
 
+/**
+ * Cierra la pantalla de chat y vuelve a la intro del personaje.
+ */
+function cerrarChat() {
+  if (Estado.materiaActiva) {
+    mostrarPersonaje(Estado.nivelActivo);
+  } else {
+    mostrarMenu();
+  }
+}
+
 // ── Helpers de API ───────────────────────────────────────────────────────────
 async function api(metodo, ruta, cuerpo) {
   const ops = { method: metodo, headers: { 'Content-Type': 'application/json' } };
@@ -314,6 +325,10 @@ async function manejarNivelCompletado(puntaje) {
   document.getElementById('resultado-sub').textContent           = `Nivel ${Estado.nivelActivo}: ${NOMBRES_NIVEL[Estado.nivelActivo-1]}`;
   document.getElementById('puntaje-resultado-display').textContent = `${pts} pts`;
   document.getElementById('resultado-estrellas').innerHTML     = estrellasHtml;
+
+  // Retroalimentación IA (no bloquea la pantalla)
+  const perName = PERSONAJES[Estado.materiaActiva]?.nombre || '';
+  pedirRetroalimentacionIA(Estado.materiaActiva, Estado.nivelActivo, pts, perName);
 
   // Botón siguiente nivel
   const hayMas = Estado.nivelActivo < 5;

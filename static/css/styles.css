@@ -1184,3 +1184,344 @@ label { font-size: 1rem; opacity: 0.85; }
   transform: translateY(2px);
   box-shadow: 0 2px 0 #1b5e20;
 }
+
+/* ══════════════════════════════════════════════════════
+   PANTALLA 8 — CHAT IA CON PERSONAJE
+════════════════════════════════════════════════════════ */
+
+/* Contenedor principal del chat */
+#screen-ia-chat {
+  justify-content: flex-start;
+  padding: 0;
+  align-items: stretch;
+}
+
+.chat-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 680px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 16px 16px 12px;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+/* ── Cabecera del chat ───────────────────────────────── */
+.chat-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-radius: 18px;
+  flex-shrink: 0;
+  gap: 10px;
+}
+
+.chat-cabecera-centro {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  justify-content: center;
+}
+
+.chat-nombre-personaje {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.1rem;
+  color: var(--dorado);
+  letter-spacing: 0.5px;
+}
+
+/* Badge de estado de la IA */
+.ia-badge {
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 50px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ia-badge-online {
+  background: rgba(76, 175, 80, 0.25);
+  border: 1.5px solid #4CAF50;
+  color: #a5d6a7;
+}
+
+.ia-badge-offline {
+  background: rgba(255, 179, 0, 0.2);
+  border: 1.5px solid #FFB300;
+  color: #ffe082;
+}
+
+/* ── Área de mensajes ────────────────────────────────── */
+.chat-mensajes {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 20px;
+  min-height: 0;
+  scroll-behavior: smooth;
+}
+
+.chat-mensajes::-webkit-scrollbar {
+  width: 4px;
+}
+.chat-mensajes::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-mensajes::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+/* ── Burbujas de mensaje ─────────────────────────────── */
+.chat-burbuja {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 85%;
+  animation: chat-entrada 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes chat-entrada {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* Mensaje del personaje (izquierda) */
+.chat-burbuja-personaje {
+  align-self: flex-start;
+  flex-direction: row;
+}
+
+/* Mensaje del usuario (derecha) */
+.chat-burbuja-usuario {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+/* Avatar del personaje */
+.chat-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Nombre del personaje sobre su burbuja */
+.chat-burbuja-nombre {
+  display: block;
+  font-family: 'Fredoka One', cursive;
+  font-size: 0.75rem;
+  color: var(--dorado);
+  margin-bottom: 4px;
+  letter-spacing: 0.3px;
+}
+
+/* Texto de la burbuja */
+.chat-burbuja-texto {
+  display: block;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.5;
+  padding: 10px 16px;
+  border-radius: 18px;
+  word-break: break-word;
+}
+
+.chat-burbuja-personaje .chat-burbuja-texto {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border-radius: 4px 18px 18px 18px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.chat-burbuja-usuario .chat-burbuja-texto {
+  background: linear-gradient(135deg, #FFB300, #FF8F00);
+  color: #3e2723;
+  border-radius: 18px 4px 18px 18px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Animación "escribiendo..." ──────────────────────── */
+.chat-escribiendo-wrapper {
+  align-self: flex-start;
+}
+
+.chat-puntos {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px 18px 18px 18px;
+  backdrop-filter: blur(8px);
+}
+
+.chat-puntos span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  animation: chat-pulso 1.2s infinite ease-in-out;
+}
+
+.chat-puntos span:nth-child(2) { animation-delay: 0.2s; }
+.chat-puntos span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes chat-pulso {
+  0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+  40%            { transform: scale(1.1); opacity: 1;   }
+}
+
+/* ── Botones rápidos ─────────────────────────────────── */
+.chat-acciones-rapidas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.chat-btn-rapido {
+  font-size: 0.8rem !important;
+  padding: 7px 14px !important;
+  border-radius: 50px !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.2) !important;
+  background: rgba(0, 0, 0, 0.3) !important;
+  color: #fff !important;
+  font-family: 'Nunito', sans-serif !important;
+  font-weight: 800 !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.chat-btn-rapido:hover {
+  background: rgba(255, 179, 0, 0.2) !important;
+  border-color: var(--dorado) !important;
+  transform: translateY(-2px);
+}
+
+/* ── Fila de input ───────────────────────────────────── */
+.chat-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 50px !important;
+  flex-shrink: 0;
+}
+
+.chat-input-row input[type="text"] {
+  flex: 1;
+  margin: 0;
+  border-radius: 50px;
+  font-size: 0.95rem;
+  padding: 10px 18px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+}
+
+.chat-input-row input[type="text"]:focus {
+  border-color: var(--dorado);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.chat-btn-enviar {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 0 !important;
+}
+
+.chat-btn-enviar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+  transform: none !important;
+}
+
+/* ── Retroalimentación IA en pantalla de resultado ───── */
+.ia-retro-box {
+  margin: 12px 0;
+  border-radius: 16px;
+  overflow: hidden;
+  animation: chat-entrada 0.4s ease;
+}
+
+.ia-retro-burbuja {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.ia-retro-escribiendo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+}
+
+.ia-retro-texto {
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.5;
+  margin: 0;
+  text-align: left;
+  font-style: italic;
+}
+
+/* Botón "Hablar con personaje" en pantalla de intro */
+#btn-chat-personaje {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border: 2px solid rgba(255, 255, 255, 0.25) !important;
+  color: #fff !important;
+  font-size: 1rem !important;
+  margin-top: 0 !important;
+  margin-bottom: 8px;
+}
+
+#btn-chat-personaje:hover {
+  background: rgba(255, 179, 0, 0.2) !important;
+  border-color: var(--dorado) !important;
+}
+

@@ -9,6 +9,8 @@ import re
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from flask import Flask, jsonify, request, render_template
+from utils.ollama_service import servicio_ia
+from data.ia_fallback import MATERIA_A_PERSONAJE
 from utils.database import (
     inicializar_base_de_datos,
     obtener_o_crear_estudiante,
@@ -125,6 +127,64 @@ def get_niveles_materia(materia):
         if n["materia"] == materia
     ]
     return jsonify(niveles)
+
+
+# ── API: IA Local (Ollama) ────────────────────────────────────────────────────
+
+@app.route("/api/ia/estado")
+def ia_estado():
+    """Verifica si el servicio de IA local (Ollama) está disponible."""
+    disponible = servicio_ia.verificar_disponibilidad()
+    return jsonify({
+        "disponible": disponible,
+        "modelo": servicio_ia.modelo,
+    })
+
+
+@app.route("/api/ia/chat", methods=["POST"])
+def ia_chat():
+    """Envía un mensaje al personaje IA y recibe una respuesta."""
+    datos = request.get_json(silent=True) or {}
+    mensaje = (datos.get("mensaje") or "").strip()
+    personaje = (datos.get("personaje") or "").strip()
+    materia = (datos.get("materia") or "").strip()
+    nivel = int(datos.get("nivel", 0))
+
+    if not mensaje:
+        return jsonify({"error": "El mensaje es requerido"}), 400
+
+    # Si no se especificó personaje, inferirlo de la materia
+    if not personaje and materia:
+        personaje = MATERIA_A_PERSONAJE.get(materia, "")
+
+    resultado = servicio_ia.generar_respuesta(
+        personaje=personaje,
+        mensaje=mensaje,
+        contexto_materia=materia,
+        contexto_nivel=nivel,
+    )
+    return jsonify(resultado)
+
+
+@app.route("/api/ia/retroalimentacion", methods=["POST"])
+def ia_retroalimentacion():
+    """Genera retroalimentación IA después de completar un nivel."""
+    datos = request.get_json(silent=True) or {}
+    personaje = (datos.get("personaje") or "").strip()
+    materia = (datos.get("materia") or "").strip()
+    nivel = int(datos.get("nivel", 0))
+    puntaje = int(datos.get("puntaje", 0))
+
+    if not personaje and materia:
+        personaje = MATERIA_A_PERSONAJE.get(materia, "")
+
+    resultado = servicio_ia.generar_retroalimentacion(
+        personaje=personaje,
+        materia=materia,
+        nivel=nivel,
+        puntaje=puntaje,
+    )
+    return jsonify(resultado)
 
 
 if __name__ == "__main__":
