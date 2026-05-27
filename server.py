@@ -177,11 +177,7 @@ def get_niveles_materia(materia):
 @app.route("/api/ia/estado")
 def ia_estado():
     """Verifica si el servicio de IA local (Ollama) está disponible."""
-    disponible = servicio_ia.verificar_disponibilidad()
-    return jsonify({
-        "disponible": disponible,
-        "modelo": servicio_ia.modelo,
-    })
+    return jsonify(servicio_ia.estado())
 
 
 @app.route("/api/ia/chat", methods=["POST"])
@@ -207,6 +203,40 @@ def ia_chat():
         mensaje=mensaje,
         contexto_materia=materia,
         contexto_nivel=nivel,
+        contexto_nivel_info=contexto_nivel,
+    )
+    return jsonify(resultado)
+
+
+@app.route("/api/ia/pista", methods=["POST"])
+def ia_pista():
+    """Genera una pista corta y contextual para el nivel actual."""
+    datos = request.get_json(silent=True) or {}
+    personaje = (datos.get("personaje") or "").strip()
+    materia = (datos.get("materia") or "").strip()
+    nivel = _leer_entero(datos.get("nivel", 0))
+    instruccion = (datos.get("instruccion") or "").strip()
+    minijuego = (datos.get("minijuego") or "").strip()
+
+    if not materia or not nivel:
+        return jsonify({
+            "respuesta": "Lee la instruccion con calma y prueba paso a paso.",
+            "fuente": "fallback",
+            "modelo": servicio_ia.modelo,
+            "disponible": False,
+            "error": "Materia y nivel son requeridos para una pista contextual.",
+        }), 400
+
+    if not personaje and materia:
+        personaje = MATERIA_A_PERSONAJE.get(materia, "")
+
+    contexto_nivel = _obtener_contexto_ia_nivel(materia, nivel) if _ia_habilitada_para_nivel(materia, nivel) else None
+    resultado = servicio_ia.generar_pista(
+        personaje=personaje,
+        materia=materia,
+        nivel=nivel,
+        instruccion=instruccion,
+        minijuego=minijuego,
         contexto_nivel_info=contexto_nivel,
     )
     return jsonify(resultado)

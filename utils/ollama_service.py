@@ -1,76 +1,74 @@
 """
 ollama_service.py - Servicio de IA local usando Ollama.
-Gestiona la comunicación con el modelo TinyLlama para generar respuestas
-educativas en el juego Pacífico Educativo.
-Incluye fallback automático si Ollama no está disponible.
+
+Usa un modelo local liviano sin API keys externas. El modelo principal se
+configura con OLLAMA_MODEL y por defecto usa llama3.2:1b. TinyLlama queda como
+opcion de respaldo documentada para equipos con menos recursos.
 """
 
+from __future__ import annotations
+
 import json
-import time
+import os
+import socket
 import threading
-from urllib import request as urllib_request
-from urllib.error import URLError
+import time
 from collections import OrderedDict
+from urllib import request as urllib_request
+from urllib.error import HTTPError, URLError
 
 from data.ia_fallback import (
-    obtener_respuesta_fallback,
-    clasificar_mensaje,
     MATERIA_A_PERSONAJE,
+    clasificar_mensaje,
+    obtener_respuesta_fallback,
 )
 
 
-# ── Configuración ────────────────────────────────────────────────────────────
-
-OLLAMA_URL = "http://localhost:11434"
-MODELO_DEFECTO = "tinyllama"
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
+MODELO_DEFECTO = os.getenv("OLLAMA_MODEL", "llama3.2:1b")
+MODELO_RESPALDO = "tinyllama"
 TIMEOUT_SEGUNDOS = 8
 MAX_TOKENS = 120
 TEMPERATURA = 0.7
 CACHE_MAX = 30
 
 
-# ── System prompts por personaje ─────────────────────────────────────────────
-
 SYSTEM_PROMPTS = {
     "El Riviel": (
-        "Eres El Riviel, un espíritu sabio del río Pacífico colombiano. "
-        "Hablas con niños de 8 a 12 años. Enseñas matemáticas usando ejemplos "
-        "del río, cangrejos, peces y canoas. Responde SIEMPRE en español. "
-        "Máximo 2 oraciones cortas. Usa emojis. Sé amigable y motivador."
+        "Eres El Riviel, un espiritu sabio del rio Pacifico colombiano. "
+        "Hablas con ninos de 8 a 12 anos. Ensenas matematicas con ejemplos "
+        "del rio, cangrejos, peces y canoas."
     ),
     "La Tunda": (
-        "Eres La Tunda, guardiana mística del bosque del Pacífico colombiano. "
-        "Hablas con niños de 8 a 12 años. Enseñas lenguaje usando ejemplos "
-        "del bosque, árboles, pájaros y la selva. Responde SIEMPRE en español. "
-        "Máximo 2 oraciones cortas. Usa emojis. Sé amigable y motivadora."
+        "Eres La Tunda, guardiana mistica del bosque del Pacifico colombiano. "
+        "Hablas con ninos de 8 a 12 anos. Ensenas lenguaje con ejemplos "
+        "del bosque, arboles, pajaros y la selva."
     ),
     "El Duende": (
-        "Eres El Duende, un personaje mágico que enseña inglés a niños "
-        "colombianos de 8 a 12 años. Mezclas español e inglés de forma divertida. "
-        "Usas vocabulario básico en inglés con traducción. "
-        "Máximo 2 oraciones cortas. Usa emojis. Sé divertido y motivador."
+        "Eres El Duende, un personaje magico que ensena ingles a ninos "
+        "colombianos de 8 a 12 anos. Mezclas espanol e ingles de forma clara."
     ),
     "La Madre de Agua": (
-        "Eres La Madre de Agua, protectora de la vida acuática del Pacífico "
-        "colombiano. Hablas con niños de 8 a 12 años. Enseñas biología usando "
-        "ejemplos del manglar, ballenas, peces y el ecosistema. "
-        "Responde SIEMPRE en español. Máximo 2 oraciones cortas. Usa emojis. "
-        "Sé amigable y sabia."
+        "Eres La Madre de Agua, protectora de la vida acuatica del Pacifico "
+        "colombiano. Hablas con ninos de 8 a 12 anos y ensenas biologia con "
+        "ejemplos del manglar, ballenas, peces y el ecosistema."
     ),
 }
 
 SYSTEM_PROMPT_GENERICO = (
-    "Eres un personaje amigable del juego educativo Pacífico Educativo. "
-    "Hablas con niños de 8 a 12 años del Pacífico colombiano. "
-    "Responde SIEMPRE en español. Máximo 2 oraciones cortas. "
-    "Usa emojis. Sé amigable y motivador."
+    "Eres un personaje amigable del juego educativo Pacifico Educativo. "
+    "Hablas con ninos de 8 a 12 anos del Pacifico colombiano."
+)
+
+REGLAS_RESPUESTA_CORTA = (
+    "Responde siempre en espanol, con tono infantil, educativo y motivador. "
+    "Usa maximo 2 oraciones cortas, o 3 si es una pista. "
+    "No menciones detalles tecnicos, Ollama, modelos ni errores internos."
 )
 
 
-# ── Caché simple en memoria ─────────────────────────────────────────────────
-
 class CacheIA:
-    """Caché LRU simple en memoria para evitar llamadas repetidas a Ollama."""
+    """Cache LRU simple en memoria para evitar llamadas repetidas a Ollama."""
 
     def __init__(self, capacidad: int = CACHE_MAX):
         self._cache = OrderedDict()
@@ -78,7 +76,6 @@ class CacheIA:
         self._lock = threading.Lock()
 
     def obtener(self, clave: str) -> str | None:
-        """Busca una respuesta en caché. None si no existe."""
         with self._lock:
             if clave in self._cache:
                 self._cache.move_to_end(clave)
@@ -86,7 +83,6 @@ class CacheIA:
         return None
 
     def guardar(self, clave: str, valor: str):
-        """Guarda una respuesta en caché, eliminando la más vieja si está lleno."""
         with self._lock:
             if clave in self._cache:
                 self._cache.move_to_end(clave)
@@ -95,26 +91,51 @@ class CacheIA:
                 self._cache.popitem(last=False)
 
 
-# ── Servicio principal ───────────────────────────────────────────────────────
-
 class ServicioIA:
     """
-    Servicio de IA local que usa Ollama con TinyLlama.
-    Si Ollama no está disponible, usa fallback automático con respuestas
-    predefinidas para garantizar funcionamiento offline.
+    Servicio de IA local con Ollama.
+
+    Si Ollama esta apagado, el modelo no esta instalado, hay timeout o la
+    respuesta viene vacia, devuelve fallback offline para que el juego no se
+    detenga.
     """
 
-    def __init__(self, modelo: str = MODELO_DEFECTO):
+    def __init__(self, modelo: str = MODELO_DEFECTO, url: str = OLLAMA_URL):
         self.modelo = modelo
+        self.url = url.rstrip("/")
         self.cache = CacheIA()
-        self._disponible = None  # None = no verificado aún
-        self._ultima_verificacion = 0
+        self._disponible: bool | None = None
+        self._ultima_verificacion = 0.0
+        self._ultimo_error = ""
 
-    def _clave_cache(self, personaje: str, mensaje: str, contexto_materia: str, contexto_nivel: int, contexto_nivel_info: dict | None) -> str:
+    def estado(self) -> dict:
+        disponible = self.verificar_disponibilidad()
+        return {
+            "disponible": disponible,
+            "modelo": self.modelo,
+            "modelo_respaldo": MODELO_RESPALDO,
+            "url": self.url,
+            "fuente": "ollama" if disponible else "fallback",
+            "mensaje": (
+                "IA local activa."
+                if disponible
+                else "Modo sin conexion activo: usare respuestas educativas de respaldo."
+            ),
+            "error": "" if disponible else self._ultimo_error,
+        }
+
+    def _clave_cache(
+        self,
+        personaje: str,
+        mensaje: str,
+        contexto_materia: str,
+        contexto_nivel: int,
+        contexto_nivel_info: dict | None,
+    ) -> str:
         nombre_nivel = ""
         if isinstance(contexto_nivel_info, dict):
             nombre_nivel = str(contexto_nivel_info.get("nombre", ""))
-        return f"{personaje}:{contexto_materia}:{contexto_nivel}:{nombre_nivel}:{mensaje[:80]}"
+        return f"{self.modelo}:{personaje}:{contexto_materia}:{contexto_nivel}:{nombre_nivel}:{mensaje[:80]}"
 
     def _construir_contexto_nivel(
         self,
@@ -134,7 +155,7 @@ class ServicioIA:
                 ("personaje", "Personaje del nivel"),
                 ("minijuego", "Minijuego"),
                 ("modo", "Modo"),
-                ("instruccion", "Instrucción"),
+                ("instruccion", "Instruccion"),
                 ("frase_intro", "Frase intro"),
             ):
                 valor = contexto_nivel_info.get(clave)
@@ -154,41 +175,62 @@ class ServicioIA:
         return " ".join(partes)
 
     def verificar_disponibilidad(self) -> bool:
-        """
-        Verifica si Ollama está corriendo y el modelo está descargado.
-        Cachea el resultado por 30 segundos para evitar verificaciones excesivas.
-
-        Returns:
-            True si Ollama está disponible y responde, False en caso contrario.
-        """
         ahora = time.time()
         if self._disponible is not None and (ahora - self._ultima_verificacion) < 30:
             return self._disponible
 
         try:
-            req = urllib_request.Request(
-                f"{OLLAMA_URL}/api/tags",
-                method="GET",
-            )
+            req = urllib_request.Request(f"{self.url}/api/tags", method="GET")
             with urllib_request.urlopen(req, timeout=3) as resp:
                 datos = json.loads(resp.read().decode("utf-8"))
                 modelos = [m.get("name", "") for m in datos.get("models", [])]
-                # Verificar si el modelo está disponible (con o sin tag)
-                self._disponible = any(
-                    self.modelo in nombre for nombre in modelos
-                )
+                self._disponible = self._modelo_instalado(modelos)
                 self._ultima_verificacion = ahora
                 if self._disponible:
+                    self._ultimo_error = ""
                     print(f"[IA] Ollama disponible con modelo '{self.modelo}'.")
                 else:
+                    self._ultimo_error = f"Modelo '{self.modelo}' no instalado."
                     print(f"[IA] Ollama corriendo pero modelo '{self.modelo}' no encontrado.")
                     print(f"[IA] Modelos disponibles: {modelos}")
                 return self._disponible
-        except (URLError, OSError, Exception) as e:
+        except (URLError, OSError, socket.timeout, TimeoutError) as e:
             self._disponible = False
             self._ultima_verificacion = ahora
+            self._ultimo_error = "Ollama no esta corriendo o no responde en el puerto configurado."
             print(f"[IA] Ollama no disponible: {e}")
             return False
+
+    def _modelo_instalado(self, modelos: list[str]) -> bool:
+        for nombre in modelos:
+            if nombre == self.modelo:
+                return True
+            if ":" not in self.modelo and nombre.startswith(f"{self.modelo}:"):
+                return True
+        return False
+
+    def _resultado_fallback(
+        self,
+        personaje: str,
+        tipo: str,
+        materia: str = "",
+        nivel: int = 0,
+        contexto_nivel_info: dict | None = None,
+    ) -> dict:
+        respuesta = obtener_respuesta_fallback(
+            personaje,
+            tipo,
+            materia=materia,
+            nivel=nivel,
+            contexto=contexto_nivel_info,
+        )
+        return {
+            "respuesta": respuesta,
+            "fuente": "fallback",
+            "modelo": self.modelo,
+            "disponible": False,
+            "error": self._ultimo_error,
+        }
 
     def generar_respuesta(
         self,
@@ -198,26 +240,22 @@ class ServicioIA:
         contexto_nivel: int = 0,
         contexto_nivel_info: dict | None = None,
     ) -> dict:
-        """
-        Genera una respuesta del personaje al mensaje del usuario.
-        Intenta usar Ollama; si falla, usa fallback automático.
+        if not personaje and contexto_materia:
+            personaje = MATERIA_A_PERSONAJE.get(contexto_materia, "")
 
-        Args:
-            personaje:        Nombre del personaje (ej. 'El Riviel').
-            mensaje:          Texto del usuario.
-            contexto_materia: Materia actual (ej. 'matematicas').
-            contexto_nivel:   Nivel actual (1-5).
-
-        Returns:
-            Dict con {respuesta: str, fuente: 'ollama'|'fallback'}.
-        """
-        # Intentar caché primero
-        clave_cache = self._clave_cache(personaje, mensaje, contexto_materia, contexto_nivel, contexto_nivel_info)
+        clave_cache = self._clave_cache(
+            personaje, mensaje, contexto_materia, contexto_nivel, contexto_nivel_info
+        )
         respuesta_cache = self.cache.obtener(clave_cache)
         if respuesta_cache:
-            return {"respuesta": respuesta_cache, "fuente": "cache"}
+            return {
+                "respuesta": respuesta_cache,
+                "fuente": "cache",
+                "modelo": self.modelo,
+                "disponible": True,
+                "error": "",
+            }
 
-        # Intentar Ollama
         if self.verificar_disponibilidad():
             respuesta_ia = self._llamar_ollama(
                 personaje,
@@ -228,12 +266,18 @@ class ServicioIA:
             )
             if respuesta_ia:
                 self.cache.guardar(clave_cache, respuesta_ia)
-                return {"respuesta": respuesta_ia, "fuente": "ollama"}
+                return {
+                    "respuesta": respuesta_ia,
+                    "fuente": "ollama",
+                    "modelo": self.modelo,
+                    "disponible": True,
+                    "error": "",
+                }
 
-        # Fallback automático
         tipo = clasificar_mensaje(mensaje)
-        respuesta_fb = obtener_respuesta_fallback(personaje, tipo)
-        return {"respuesta": respuesta_fb, "fuente": "fallback"}
+        return self._resultado_fallback(
+            personaje, tipo, contexto_materia, contexto_nivel, contexto_nivel_info
+        )
 
     def generar_retroalimentacion(
         self,
@@ -243,25 +287,16 @@ class ServicioIA:
         puntaje: int,
         contexto_nivel_info: dict | None = None,
     ) -> dict:
-        """
-        Genera retroalimentación después de completar un nivel.
+        if not personaje and materia:
+            personaje = MATERIA_A_PERSONAJE.get(materia, "")
 
-        Args:
-            personaje: Nombre del personaje guía.
-            materia:   Materia del nivel.
-            nivel:     Número de nivel completado.
-            puntaje:   Puntaje obtenido (0-100).
-
-        Returns:
-            Dict con {respuesta: str, fuente: 'ollama'|'fallback'}.
-        """
         tipo_retro = "retroalimentacion_buena" if puntaje >= 60 else "retroalimentacion_regular"
 
         if self.verificar_disponibilidad():
             prompt_usuario = (
-                f"El niño acaba de completar el nivel {nivel} de {materia} "
-                f"con {puntaje} puntos de 100. "
-                f"Dale una retroalimentación {'positiva' if puntaje >= 60 else 'motivadora'}."
+                f"El nino completo el nivel {nivel} de {materia} con {puntaje} puntos de 100. "
+                f"Dale una retroalimentacion {'positiva' if puntaje >= 60 else 'motivadora'} "
+                "y una recomendacion muy corta para seguir jugando."
             )
             respuesta_ia = self._llamar_ollama(
                 personaje,
@@ -271,10 +306,52 @@ class ServicioIA:
                 contexto_nivel_info,
             )
             if respuesta_ia:
-                return {"respuesta": respuesta_ia, "fuente": "ollama"}
+                return {
+                    "respuesta": respuesta_ia,
+                    "fuente": "ollama",
+                    "modelo": self.modelo,
+                    "disponible": True,
+                    "error": "",
+                }
 
-        respuesta_fb = obtener_respuesta_fallback(personaje, tipo_retro)
-        return {"respuesta": respuesta_fb, "fuente": "fallback"}
+        return self._resultado_fallback(personaje, tipo_retro, materia, nivel, contexto_nivel_info)
+
+    def generar_pista(
+        self,
+        personaje: str,
+        materia: str,
+        nivel: int,
+        instruccion: str = "",
+        minijuego: str = "",
+        contexto_nivel_info: dict | None = None,
+    ) -> dict:
+        if not personaje and materia:
+            personaje = MATERIA_A_PERSONAJE.get(materia, "")
+
+        datos_contexto = dict(contexto_nivel_info or {})
+        if instruccion:
+            datos_contexto["instruccion"] = instruccion
+        if minijuego:
+            datos_contexto["minijuego"] = minijuego
+
+        prompt_usuario = (
+            f"Dame una pista corta para un nino en el nivel {nivel} de {materia}. "
+            f"Instruccion del juego: {instruccion or datos_contexto.get('instruccion', '')}. "
+            "No des la respuesta completa; solo orienta el primer paso."
+        )
+
+        if self.verificar_disponibilidad():
+            respuesta_ia = self._llamar_ollama(personaje, prompt_usuario, materia, nivel, datos_contexto)
+            if respuesta_ia:
+                return {
+                    "respuesta": respuesta_ia,
+                    "fuente": "ollama",
+                    "modelo": self.modelo,
+                    "disponible": True,
+                    "error": "",
+                }
+
+        return self._resultado_fallback(personaje, "pista", materia, nivel, datos_contexto)
 
     def _llamar_ollama(
         self,
@@ -284,19 +361,6 @@ class ServicioIA:
         contexto_nivel: int = 0,
         contexto_nivel_info: dict | None = None,
     ) -> str | None:
-        """
-        Realiza la llamada HTTP a la API local de Ollama.
-        No bloquea más de TIMEOUT_SEGUNDOS.
-
-        Args:
-            personaje:        Nombre del personaje.
-            mensaje:          Mensaje del usuario.
-            contexto_materia: Materia para contexto adicional.
-            contexto_nivel:   Nivel para contexto adicional.
-
-        Returns:
-            String con la respuesta generada, o None si falló.
-        """
         system_prompt = SYSTEM_PROMPTS.get(personaje, SYSTEM_PROMPT_GENERICO)
         contexto_extra = self._construir_contexto_nivel(
             contexto_materia,
@@ -305,6 +369,7 @@ class ServicioIA:
         )
         if contexto_extra:
             system_prompt = f"{system_prompt} Contexto del nivel: {contexto_extra}"
+        system_prompt = f"{system_prompt} {REGLAS_RESPUESTA_CORTA}"
 
         payload = {
             "model": self.modelo,
@@ -324,7 +389,7 @@ class ServicioIA:
         try:
             datos_json = json.dumps(payload).encode("utf-8")
             req = urllib_request.Request(
-                f"{OLLAMA_URL}/api/chat",
+                f"{self.url}/api/chat",
                 data=datos_json,
                 headers={"Content-Type": "application/json"},
                 method="POST",
@@ -333,15 +398,48 @@ class ServicioIA:
                 resultado = json.loads(resp.read().decode("utf-8"))
                 contenido = resultado.get("message", {}).get("content", "").strip()
                 if contenido:
+                    contenido = self._normalizar_respuesta(contenido)
                     print(f"[IA] Respuesta Ollama ({personaje}): {contenido[:80]}...")
                     return contenido
+                self._ultimo_error = "Ollama respondio sin contenido."
                 return None
-        except Exception as e:
+        except (socket.timeout, TimeoutError) as e:
+            print(f"[IA] Timeout al llamar Ollama: {e}")
+            self._disponible = False
+            self._ultimo_error = "Ollama tardo demasiado en responder."
+            return None
+        except HTTPError as e:
+            print(f"[IA] Error HTTP al llamar Ollama: {e}")
+            self._disponible = False
+            self._ultimo_error = "Ollama rechazo la solicitud o el modelo no esta listo."
+            return None
+        except (URLError, OSError, Exception) as e:
             print(f"[IA] Error al llamar Ollama: {e}")
             self._disponible = False
+            self._ultimo_error = "No pude conectar con Ollama; usare modo de respaldo."
             return None
 
+    def _normalizar_respuesta(self, texto: str) -> str:
+        limpio = " ".join(str(texto).split())
+        partes = _separar_oraciones(limpio)
+        if len(partes) > 3:
+            return " ".join(partes[:3])
+        return limpio
 
-# ── Instancia global del servicio ────────────────────────────────────────────
+
+def _separar_oraciones(texto: str) -> list[str]:
+    partes = []
+    inicio = 0
+    for i, ch in enumerate(texto):
+        if ch in ".!?":
+            frag = texto[inicio:i + 1].strip()
+            if frag:
+                partes.append(frag)
+            inicio = i + 1
+    resto = texto[inicio:].strip()
+    if resto:
+        partes.append(resto)
+    return partes or [texto]
+
 
 servicio_ia = ServicioIA()

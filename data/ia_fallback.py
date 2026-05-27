@@ -24,6 +24,14 @@ RESPUESTAS_PERSONAJE = {
             "Recuerda: sumar es juntar y restar es quitar. ¡Como la marea que sube y baja!",
             "¡Tranquilo! Hasta el río más grande empezó con una gota. Inténtalo de nuevo.",
         ],
+        "pista": [
+            "Mira con calma lo que te pide el nivel y cuenta paso a paso antes de tocar. ¡El río te guía!",
+            "Busca primero los números o grupos que coincidan con la instrucción. No corras, observa bien.",
+        ],
+        "error": [
+            "Buen intento. Revisa la instrucción y vuelve a probar con calma.",
+            "Casi lo tienes. Cuenta otra vez antes de elegir.",
+        ],
         "historia": [
             "Había una vez un cangrejo que no sabía contar. Un día, el río le enseñó que cada ola traía un número nuevo. Así aprendió a sumar: ola tras ola. 🌊",
             "En el manglar vivían 5 peces amigos. Un día llegaron 3 más y juntos formaron la pandilla más divertida del Pacífico. ¿Cuántos eran en total? ¡8! 🐟",
@@ -60,6 +68,14 @@ RESPUESTAS_PERSONAJE = {
             "Lee despacio, como caminas por la selva. Cada letra es un paso.",
             "¡No te apures! Las palabras bonitas se arman con calma, como un nido.",
             "Piensa en el sonido: MA-RIM-BA. ¿Ves? Cada parte tiene su música. 🎵",
+        ],
+        "pista": [
+            "Lee la instrucción en voz baja y escucha el sonido de la palabra.",
+            "Busca la letra, sílaba o palabra que encaje mejor con lo que pide La Tunda.",
+        ],
+        "error": [
+            "Buen intento. Lee despacio y fíjate en el sonido inicial.",
+            "Vuelve a mirar la palabra; las letras te dan una pista.",
         ],
         "historia": [
             "En lo profundo del bosque, La Tunda guardaba un libro mágico. Cada vez que un niño aprendía una palabra nueva, una flor nacía en la selva. 🌺",
@@ -98,6 +114,14 @@ RESPUESTAS_PERSONAJE = {
             "¡No te preocupes! Learning es aprender, y tú estás aprendiendo muy bien.",
             "Escucha la palabra en tu mente: MONKEY suena como 'mon-ki'. ¡Fácil! 🐒",
         ],
+        "pista": [
+            "Piensa en la palabra en español y luego recuerda su nombre en inglés.",
+            "Repite la palabra en voz alta: eso te ayuda a encontrar la opción correcta.",
+        ],
+        "error": [
+            "Good try. Mira otra vez la palabra en inglés y piensa en su significado.",
+            "Casi. Repite la palabra despacio y vuelve a intentarlo.",
+        ],
         "historia": [
             "Once upon a time, a little FISH learned to count: ONE, TWO, THREE! And the whole RIVER celebrated. 🐟",
             "The MONKEY said 'HELLO' to the WHALE. The WHALE said 'HI' back. And they became FRIENDS forever! 🐋🐒",
@@ -134,6 +158,14 @@ RESPUESTAS_PERSONAJE = {
             "La cadena alimenticia es como un río: la energía fluye del sol a las plantas y de las plantas a los animales. ☀️",
             "¡Piensa en nuestro manglar! Las raíces están en el agua y las hojas en el aire.",
             "Cada ser vivo tiene su lugar especial en el ecosistema. ¡Ninguno sobra! 🦜",
+        ],
+        "pista": [
+            "Observa si el elemento es animal, planta, agua o una acción para cuidar la naturaleza.",
+            "Piensa en cómo vive cada ser del Pacífico y elige con cuidado.",
+        ],
+        "error": [
+            "Buen intento. Observa qué necesita cada ser vivo para estar bien.",
+            "Casi lo logras. Piensa si esa acción cuida o daña el agua.",
         ],
         "historia": [
             "En el manglar más antiguo del Pacífico vivía una familia de cangrejos. Ellos limpiaban el agua para que los peces pudieran respirar. Así funciona la naturaleza: todos nos ayudamos. 🦀",
@@ -172,6 +204,13 @@ RESPUESTAS_GENERICAS = {
         "¡No te rindas! Cada intento te hace más fuerte.",
         "Respira profundo y vuelve a intentarlo. ¡La respuesta está cerca!",
     ],
+    "pista": [
+        "Lee la instrucción con calma y busca una pista en las palabras clave.",
+        "Observa primero, piensa después y elige al final. ¡Tú puedes!",
+    ],
+    "error": [
+        "Buen intento. Respira, mira la instrucción y prueba otra vez.",
+    ],
     "historia": [
         "En el Pacífico colombiano hay playas hermosas, selvas mágicas y ríos llenos de vida. ¡Es un lugar increíble para aprender! 🌊",
     ],
@@ -205,14 +244,21 @@ MATERIA_A_PERSONAJE = {
 
 # ── Funciones de acceso al fallback ──────────────────────────────────────────
 
-def obtener_respuesta_fallback(personaje: str, tipo: str = "default") -> str:
+def obtener_respuesta_fallback(
+    personaje: str,
+    tipo: str = "default",
+    materia: str = "",
+    nivel: int = 0,
+    contexto: dict | None = None,
+) -> str:
     """
     Devuelve una respuesta aleatoria del fallback para un personaje y tipo dados.
 
     Args:
         personaje: Nombre del personaje (ej. 'El Riviel').
-        tipo:      Tipo de respuesta (saludo, ayuda, historia, pregunta,
-                   retroalimentacion_buena, retroalimentacion_regular, default).
+        tipo:      Tipo de respuesta (saludo, ayuda, pista, error, historia,
+                   pregunta, retroalimentacion_buena, retroalimentacion_regular,
+                   default).
 
     Returns:
         String con la respuesta seleccionada aleatoriamente.
@@ -225,7 +271,25 @@ def obtener_respuesta_fallback(personaje: str, tipo: str = "default") -> str:
     if not respuestas:
         respuestas = RESPUESTAS_GENERICAS.get(tipo, RESPUESTAS_GENERICAS["default"])
 
-    return random.choice(respuestas)
+    respuesta = random.choice(respuestas)
+
+    if tipo == "pista":
+        instruccion = ""
+        nombre_nivel = ""
+        if isinstance(contexto, dict):
+            instruccion = contexto.get("instruccion", "") or ""
+            nombre_nivel = contexto.get("nombre", "") or ""
+        partes = []
+        if nombre_nivel:
+            partes.append(f"En {nombre_nivel},")
+        elif materia and nivel:
+            partes.append(f"En el nivel {nivel} de {materia},")
+        if instruccion:
+            partes.append(f"recuerda: {instruccion}")
+        if partes:
+            return " ".join(partes) + f" {respuesta}"
+
+    return respuesta
 
 
 def clasificar_mensaje(mensaje: str) -> str:
@@ -252,7 +316,7 @@ def clasificar_mensaje(mensaje: str) -> str:
         "pista", "explica", "cómo", "help", "no puedo",
     ]
     if any(p in texto for p in palabras_ayuda):
-        return "ayuda"
+        return "pista" if "pista" in texto else "ayuda"
 
     # Historia
     palabras_historia = [
