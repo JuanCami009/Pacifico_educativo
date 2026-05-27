@@ -15,6 +15,12 @@ CÓMO INICIAR EL JUEGO
 3. El juego se abrirá automáticamente a pantalla completa. ¡No necesita instalar nada!
 4. La primera vez que lo abra, aparecerá un archivo llamado "progress.db" al lado del juego. No lo borre, ahí se guardan los puntajes de los niños.
 
+IA LOCAL SIN INTERNET
+1. El juego ya puede usar un modelo liviano que corre en el mismo computador con Ollama.
+2. El modelo configurado por defecto es "tinyllama" y no necesita apikey ni conexión a servicios externos.
+3. Si Ollama no está disponible, el juego responde con un modo de respaldo para que la experiencia no se detenga.
+4. Para activar la IA local, Ollama debe estar instalado y ejecutándose en el computador donde corre el juego.
+
 CÓMO VER LOS PUNTAJES DE LOS ESTUDIANTES
 1. Cuando un niño escriba su nombre al inicio, el juego lo recordará.
 2. En el menú principal (donde están las 4 materias), haga clic en el botón "Ver mis puntajes" en la esquina inferior.

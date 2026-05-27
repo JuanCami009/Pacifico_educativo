@@ -28,6 +28,9 @@ app = Flask(__name__, static_folder="static", template_folder="templates")
 inicializar_base_de_datos()
 
 MATERIAS = ["matematicas", "lenguaje", "ingles", "biologia"]
+IA_NIVELES_HABILITADOS = {
+    materia: {1, 2, 3, 4, 5} for materia in MATERIAS
+}
 
 
 def _transformar_rutas(obj):
@@ -42,6 +45,46 @@ def _transformar_rutas(obj):
     if isinstance(obj, str):
         return obj.replace("assets/", "/static/")
     return obj
+
+
+def _leer_entero(valor, por_defecto=0):
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return por_defecto
+
+
+def _ia_habilitada_para_nivel(materia, nivel):
+    return nivel in IA_NIVELES_HABILITADOS.get(materia, set())
+
+
+def _obtener_contexto_ia_nivel(materia, nivel):
+    datos = obtener_datos_nivel_completo(materia, nivel)
+    if not datos:
+        return None
+
+    contexto = {
+        "materia": materia,
+        "nivel": nivel,
+        "nombre": datos.get("nombre", ""),
+        "personaje": datos.get("personaje", ""),
+        "minijuego": datos.get("minijuego", ""),
+        "modo": datos.get("modo", ""),
+        "instruccion": datos.get("instruccion", ""),
+        "frase_intro": datos.get("frase_intro", ""),
+    }
+
+    contenido = datos.get("datos")
+    if isinstance(contenido, dict):
+        contexto["conteos"] = {
+            "items": len(contenido.get("items", [])) if isinstance(contenido.get("items"), list) else 0,
+            "piezas": len(contenido.get("piezas", [])) if isinstance(contenido.get("piezas"), list) else 0,
+            "zonas": len(contenido.get("zonas", [])) if isinstance(contenido.get("zonas"), list) else 0,
+        }
+    elif isinstance(contenido, list):
+        contexto["conteos"] = {"items": len(contenido)}
+
+    return contexto
 
 
 # ── Ruta principal ───────────────────────────────────────────────────────────
@@ -148,7 +191,7 @@ def ia_chat():
     mensaje = (datos.get("mensaje") or "").strip()
     personaje = (datos.get("personaje") or "").strip()
     materia = (datos.get("materia") or "").strip()
-    nivel = int(datos.get("nivel", 0))
+    nivel = _leer_entero(datos.get("nivel", 0))
 
     if not mensaje:
         return jsonify({"error": "El mensaje es requerido"}), 400
@@ -157,11 +200,14 @@ def ia_chat():
     if not personaje and materia:
         personaje = MATERIA_A_PERSONAJE.get(materia, "")
 
+    contexto_nivel = _obtener_contexto_ia_nivel(materia, nivel) if _ia_habilitada_para_nivel(materia, nivel) else None
+
     resultado = servicio_ia.generar_respuesta(
         personaje=personaje,
         mensaje=mensaje,
         contexto_materia=materia,
         contexto_nivel=nivel,
+        contexto_nivel_info=contexto_nivel,
     )
     return jsonify(resultado)
 
@@ -172,17 +218,20 @@ def ia_retroalimentacion():
     datos = request.get_json(silent=True) or {}
     personaje = (datos.get("personaje") or "").strip()
     materia = (datos.get("materia") or "").strip()
-    nivel = int(datos.get("nivel", 0))
-    puntaje = int(datos.get("puntaje", 0))
+    nivel = _leer_entero(datos.get("nivel", 0))
+    puntaje = _leer_entero(datos.get("puntaje", 0))
 
     if not personaje and materia:
         personaje = MATERIA_A_PERSONAJE.get(materia, "")
+
+    contexto_nivel = _obtener_contexto_ia_nivel(materia, nivel) if _ia_habilitada_para_nivel(materia, nivel) else None
 
     resultado = servicio_ia.generar_retroalimentacion(
         personaje=personaje,
         materia=materia,
         nivel=nivel,
         puntaje=puntaje,
+        contexto_nivel_info=contexto_nivel,
     )
     return jsonify(resultado)
 

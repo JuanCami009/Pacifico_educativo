@@ -110,6 +110,49 @@ class ServicioIA:
         self._disponible = None  # None = no verificado aún
         self._ultima_verificacion = 0
 
+    def _clave_cache(self, personaje: str, mensaje: str, contexto_materia: str, contexto_nivel: int, contexto_nivel_info: dict | None) -> str:
+        nombre_nivel = ""
+        if isinstance(contexto_nivel_info, dict):
+            nombre_nivel = str(contexto_nivel_info.get("nombre", ""))
+        return f"{personaje}:{contexto_materia}:{contexto_nivel}:{nombre_nivel}:{mensaje[:80]}"
+
+    def _construir_contexto_nivel(
+        self,
+        contexto_materia: str,
+        contexto_nivel: int,
+        contexto_nivel_info: dict | None = None,
+    ) -> str:
+        partes = []
+        if contexto_materia:
+            partes.append(f"Materia: {contexto_materia}.")
+        if contexto_nivel:
+            partes.append(f"Nivel: {contexto_nivel} de 5.")
+
+        if isinstance(contexto_nivel_info, dict):
+            for clave, etiqueta in (
+                ("nombre", "Nombre del nivel"),
+                ("personaje", "Personaje del nivel"),
+                ("minijuego", "Minijuego"),
+                ("modo", "Modo"),
+                ("instruccion", "Instrucción"),
+                ("frase_intro", "Frase intro"),
+            ):
+                valor = contexto_nivel_info.get(clave)
+                if valor:
+                    partes.append(f"{etiqueta}: {valor}.")
+
+            conteos = contexto_nivel_info.get("conteos")
+            if isinstance(conteos, dict):
+                resumen = []
+                for clave in ("items", "piezas", "zonas"):
+                    cantidad = conteos.get(clave)
+                    if cantidad:
+                        resumen.append(f"{cantidad} {clave}")
+                if resumen:
+                    partes.append("Contenido interactivo: " + ", ".join(resumen) + ".")
+
+        return " ".join(partes)
+
     def verificar_disponibilidad(self) -> bool:
         """
         Verifica si Ollama está corriendo y el modelo está descargado.
@@ -153,6 +196,7 @@ class ServicioIA:
         mensaje: str,
         contexto_materia: str = "",
         contexto_nivel: int = 0,
+        contexto_nivel_info: dict | None = None,
     ) -> dict:
         """
         Genera una respuesta del personaje al mensaje del usuario.
@@ -168,14 +212,20 @@ class ServicioIA:
             Dict con {respuesta: str, fuente: 'ollama'|'fallback'}.
         """
         # Intentar caché primero
-        clave_cache = f"{personaje}:{mensaje[:80]}"
+        clave_cache = self._clave_cache(personaje, mensaje, contexto_materia, contexto_nivel, contexto_nivel_info)
         respuesta_cache = self.cache.obtener(clave_cache)
         if respuesta_cache:
             return {"respuesta": respuesta_cache, "fuente": "cache"}
 
         # Intentar Ollama
         if self.verificar_disponibilidad():
-            respuesta_ia = self._llamar_ollama(personaje, mensaje, contexto_materia, contexto_nivel)
+            respuesta_ia = self._llamar_ollama(
+                personaje,
+                mensaje,
+                contexto_materia,
+                contexto_nivel,
+                contexto_nivel_info,
+            )
             if respuesta_ia:
                 self.cache.guardar(clave_cache, respuesta_ia)
                 return {"respuesta": respuesta_ia, "fuente": "ollama"}
@@ -191,6 +241,7 @@ class ServicioIA:
         materia: str,
         nivel: int,
         puntaje: int,
+        contexto_nivel_info: dict | None = None,
     ) -> dict:
         """
         Genera retroalimentación después de completar un nivel.
@@ -212,7 +263,13 @@ class ServicioIA:
                 f"con {puntaje} puntos de 100. "
                 f"Dale una retroalimentación {'positiva' if puntaje >= 60 else 'motivadora'}."
             )
-            respuesta_ia = self._llamar_ollama(personaje, prompt_usuario, materia, nivel)
+            respuesta_ia = self._llamar_ollama(
+                personaje,
+                prompt_usuario,
+                materia,
+                nivel,
+                contexto_nivel_info,
+            )
             if respuesta_ia:
                 return {"respuesta": respuesta_ia, "fuente": "ollama"}
 
@@ -225,6 +282,7 @@ class ServicioIA:
         mensaje: str,
         contexto_materia: str = "",
         contexto_nivel: int = 0,
+        contexto_nivel_info: dict | None = None,
     ) -> str | None:
         """
         Realiza la llamada HTTP a la API local de Ollama.
@@ -240,12 +298,13 @@ class ServicioIA:
             String con la respuesta generada, o None si falló.
         """
         system_prompt = SYSTEM_PROMPTS.get(personaje, SYSTEM_PROMPT_GENERICO)
-
-        # Agregar contexto de materia/nivel si está disponible
-        if contexto_materia:
-            system_prompt += f" Estás en la materia de {contexto_materia}."
-        if contexto_nivel:
-            system_prompt += f" Nivel {contexto_nivel} de 5."
+        contexto_extra = self._construir_contexto_nivel(
+            contexto_materia,
+            contexto_nivel,
+            contexto_nivel_info,
+        )
+        if contexto_extra:
+            system_prompt = f"{system_prompt} Contexto del nivel: {contexto_extra}"
 
         payload = {
             "model": self.modelo,
