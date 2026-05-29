@@ -17,6 +17,10 @@ class MotorDragDrop {
     this.puntaje   = 100;
     this.colocadas = 0;
     this.arrastrandoId = null;
+    // Métricas de desempeño
+    this.aciertos  = 0;
+    this.errores   = 0;
+    this._inicio   = Date.now();
 
     // Compatibilidad: si vienen en formato pares (tuples) del backend antiguo
     if (!datos.piezas && !datos.zonas && datos instanceof Array) {
@@ -142,6 +146,7 @@ class MotorDragDrop {
         <strong class="zona-drop-label">${zona.etiqueta}</strong>
       `;
       this.colocadas++;
+      this.aciertos++;
 
       // Desactivar pieza correspondiente
       document.querySelectorAll('.pieza-drag').forEach(p => {
@@ -157,6 +162,7 @@ class MotorDragDrop {
     } else {
       // Error
       this.puntaje -= 10;
+      this.errores++;
       this.onPuntaje(this.puntaje);
       elZona.style.borderColor = '#f44336';
       elZona.style.boxShadow = '0 0 20px rgba(244, 67, 54, 0.4)';
@@ -168,8 +174,18 @@ class MotorDragDrop {
   }
 
   _completar() {
+    const duracion_seg = Math.round((Date.now() - this._inicio) / 1000);
     this.area.dispatchEvent(new CustomEvent('nivel_completado', {
-      bubbles: true, detail: { puntaje: Math.max(0, this.puntaje) }
+      bubbles: true,
+      detail: {
+        puntaje: Math.max(0, this.puntaje),
+        metricas: {
+          aciertos:    this.aciertos,
+          errores:     this.errores,
+          intentos:    this.aciertos + this.errores,
+          duracion_seg,
+        },
+      },
     }));
   }
 

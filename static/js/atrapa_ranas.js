@@ -30,6 +30,10 @@
     let puntaje = 0;
     let numeroPedido = 1;
     let atrapadosRonda = 0;
+    // Métricas de desempeño
+    let _aciertos = 0;
+    let _errores  = 0;
+    const _inicioMs = performance.now();
     let ultimoAnguloPintado = -999;
     /** @type {{ el: HTMLElement, n: number, x: number, y: number, dir: number, fase: number, amp: number, freq: number, correcto: boolean, escapando: boolean }[]} */
     let insectos = [];
@@ -332,7 +336,13 @@
         ronda++;
         if (ronda > RONDAS_TOTAL) {
           destruir();
-          onCompletado(Math.min(150, puntaje));
+          const duracion_seg = Math.round((performance.now() - _inicioMs) / 1000);
+          onCompletado(Math.min(150, puntaje), {
+            aciertos:    _aciertos,
+            errores:     _errores,
+            intentos:    _aciertos + _errores,
+            duracion_seg,
+          });
           return;
         }
         iniciarRonda();
@@ -358,6 +368,7 @@
       inv.el.style.setProperty('--ix', `${inv.x}px`);
       inv.el.style.setProperty('--iy', `${iy}px`);
       inv.el.classList.add('atrapa-cangrejo-vuelo-escape');
+      _errores++;
       restarVida();
       setTimeout(() => {
         inv.el.remove();
@@ -471,6 +482,7 @@
           if (ix >= 0) insectos.splice(ix, 1);
         }, 220);
         puntaje += 10;
+        _aciertos++;
         elPuntaje.textContent = String(puntaje);
         syncHudGlobal();
         animarMedallon();
@@ -500,6 +512,7 @@
           inv.atrapado = false; // Reanudar vuelo
           inv.el.classList.remove('atrapa-cangrejo-vuelo-shake');
         }, 320);
+        _errores++;
         restarVida();
         if (vidas <= 0) cancelAnimationFrame(rafId);
       });

@@ -15,6 +15,10 @@ class MotorPuzzle {
     this.datos     = nivelDatos.datos;
     this.onPuntaje = onPuntaje;
     this.puntaje   = 100;
+    // Métricas de desempeño (compartidas por ambos modos)
+    this.aciertos  = 0;
+    this.errores   = 0;
+    this._inicio   = Date.now();
 
     if (this.modo === 'secuencia') {
       this._initSecuencia();
@@ -107,6 +111,7 @@ class MotorPuzzle {
       card.classList.add('usada');
       const slot = this.slots[this.siguienteSlot];
       slot.classList.add('ocupado');
+      this.aciertos++;
       
       // Mover el contenido al slot
       slot.innerHTML = `
@@ -121,11 +126,12 @@ class MotorPuzzle {
     } else {
       // Error
       this.puntaje -= 10;
+      this.errores++;
       this.onPuntaje(this.puntaje);
       card.style.borderColor = '#f44336';
       card.style.boxShadow = '0 0 15px rgba(244, 67, 54, 0.4)';
-      setTimeout(() => { 
-        card.style.borderColor = ''; 
+      setTimeout(() => {
+        card.style.borderColor = '';
         card.style.boxShadow = '';
       }, 400);
     }
@@ -213,12 +219,14 @@ class MotorPuzzle {
           el.style.opacity = '0.3';
           el.draggable = false;
           this.colocadas++;
+          this.aciertos++;
           if (this.colocadas >= this.totalPiezas) {
             setTimeout(() => this._completar(), 500);
           }
         } else {
           // Error
           this.puntaje -= 10;
+          this.errores++;
           this.onPuntaje(this.puntaje);
           slot.style.borderColor = '#f44336';
           slot.style.boxShadow = '0 0 15px rgba(244, 67, 54, 0.4)';
@@ -238,8 +246,18 @@ class MotorPuzzle {
 
   // ── Completar nivel ───────────────────────────────────────────────────────
   _completar() {
+    const duracion_seg = Math.round((Date.now() - this._inicio) / 1000);
     this.area.dispatchEvent(new CustomEvent('nivel_completado', {
-      bubbles: true, detail: { puntaje: Math.max(0, this.puntaje) }
+      bubbles: true,
+      detail: {
+        puntaje: Math.max(0, this.puntaje),
+        metricas: {
+          aciertos:    this.aciertos,
+          errores:     this.errores,
+          intentos:    this.aciertos + this.errores,
+          duracion_seg,
+        },
+      },
     }));
   }
 

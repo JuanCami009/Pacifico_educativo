@@ -24,6 +24,72 @@
       <button id="btn-entrar" class="btn btn-primary btn-grande">¡Entrar a la aventura! 🚀</button>
       <p id="intro-error" class="error-msg hidden"></p>
     </div>
+    <button id="btn-soy-docente" class="btn btn-ghost btn-sm docente-acceso-btn">
+      <i class="fa-solid fa-chalkboard-user"></i> Soy docente
+    </button>
+  </div>
+</div>
+
+<!-- PANTALLA 9: ACCESO DOCENTE (PIN) -->
+<div id="screen-docente-pin" class="screen">
+  <div class="intro-content">
+    <div class="logo-emoji"><i class="fa-solid fa-chalkboard-user" style="font-size:3rem; color:var(--dorado);"></i></div>
+    <h2 class="logo-titulo" style="font-size:1.8rem;">Acceso Docente</h2>
+    <p class="logo-sub">Ingresa el PIN para ver los reportes</p>
+    <div class="card intro-card">
+      <label for="docente-pin-input">PIN de acceso</label>
+      <input id="docente-pin-input" type="password" placeholder="••••" maxlength="20" autocomplete="off">
+      <button id="btn-docente-ingresar" class="btn btn-primary btn-grande">Ingresar</button>
+      <p id="docente-pin-error" class="error-msg hidden"></p>
+      <button id="btn-docente-volver" class="btn btn-ghost btn-sm" style="margin-top:0.5rem;">← Volver al inicio</button>
+    </div>
+  </div>
+</div>
+
+<!-- PANTALLA 10: PANEL DOCENTE -->
+<div id="screen-docente-panel" class="screen screen-scroll">
+  <header class="app-header docente-header">
+    <button id="btn-docente-salir" class="btn btn-outline btn-sm">← Salir</button>
+    <div class="docente-titulo-header">
+      <i class="fa-solid fa-chalkboard-user"></i> Panel Docente
+    </div>
+    <span id="docente-ia-badge" class="ia-badge ia-badge-offline">🟡 Cargando...</span>
+  </header>
+
+  <div class="docente-panel-body">
+
+    <!-- Reporte de clase -->
+    <div class="card docente-card">
+      <div class="docente-card-titulo">
+        <i class="fa-solid fa-users"></i> Reporte de Clase
+      </div>
+      <p class="docente-card-desc">Resumen del desempeño de todos los estudiantes con falencias y recomendaciones pedagógicas.</p>
+      <button id="btn-reporte-clase" class="btn btn-primary">
+        <i class="fa-solid fa-chart-bar"></i> Generar Reporte de Clase
+      </button>
+      <div id="reporte-clase-box" class="docente-reporte-box hidden"></div>
+    </div>
+
+    <!-- Lista de estudiantes -->
+    <div class="card docente-card">
+      <div class="docente-card-titulo">
+        <i class="fa-solid fa-user-graduate"></i> Estudiantes
+      </div>
+      <div id="lista-estudiantes" class="lista-estudiantes-container"></div>
+    </div>
+
+    <!-- Reporte individual (se muestra al seleccionar estudiante) -->
+    <div id="reporte-individual-seccion" class="card docente-card hidden">
+      <div class="docente-card-titulo">
+        <i class="fa-solid fa-file-lines"></i>
+        Reporte de <span id="reporte-alumno-nombre">—</span>
+      </div>
+      <div id="reporte-individual-box" class="docente-reporte-box"></div>
+      <button id="btn-regenerar-reporte" class="btn btn-outline btn-sm" style="margin-top:0.8rem;">
+        <i class="fa-solid fa-rotate"></i> Regenerar con IA
+      </button>
+    </div>
+
   </div>
 </div>
 
@@ -140,11 +206,12 @@
   </div>
 </div>
 
-<script src="/static/js/point_and_click.js?v=1.1"></script>
-<script src="/static/js/drag_and_drop.js?v=1.1"></script>
-<script src="/static/js/puzzle.js?v=1.1"></script>
-<script src="/static/js/atrapa_ranas.js?v=1.1"></script>
+<script src="/static/js/point_and_click.js?v=1.2"></script>
+<script src="/static/js/drag_and_drop.js?v=1.2"></script>
+<script src="/static/js/puzzle.js?v=1.2"></script>
+<script src="/static/js/atrapa_ranas.js?v=1.2"></script>
 <script src="/static/js/ia_chat.js?v=1.0"></script>
-<script src="/static/js/app.js?v=1.1"></script>
+<script src="/static/js/app.js?v=1.2"></script>
+<script src="/static/js/docente.js?v=1.0"></script>
 </body>
 </html>

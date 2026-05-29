@@ -14,8 +14,12 @@ class MotorPointClick {
     this.items     = datos.items || [];
     this.onPuntaje = onPuntaje;
     this.puntaje   = 100;
-    this.encontrados  = 0;
+    this.encontrados    = 0;
     this.totalCorrectos = this.items.filter(i => i.es_correcto).length;
+    // Métricas de desempeño
+    this.aciertos  = 0;
+    this.errores   = 0;
+    this._inicio   = Date.now();
 
     this._render();
   }
@@ -58,6 +62,7 @@ class MotorPointClick {
       el.classList.add('correcto');
       el.style.pointerEvents = 'none';
       this.encontrados++;
+      this.aciertos++;
 
       // Agregar badge de acierto con FontAwesome check
       const badge = document.createElement('div');
@@ -72,6 +77,7 @@ class MotorPointClick {
       // Error: temblor y penalización
       el.classList.add('error');
       this.puntaje -= 10;
+      this.errores++;
       this.onPuntaje(this.puntaje);
 
       // Agregar badge de error con FontAwesome xmark
@@ -89,9 +95,18 @@ class MotorPointClick {
   }
 
   _completar() {
-    // Emitir evento de nivel completado
+    const duracion_seg = Math.round((Date.now() - this._inicio) / 1000);
     this.area.dispatchEvent(new CustomEvent('nivel_completado', {
-      bubbles: true, detail: { puntaje: Math.max(0, this.puntaje) }
+      bubbles: true,
+      detail: {
+        puntaje: Math.max(0, this.puntaje),
+        metricas: {
+          aciertos:    this.aciertos,
+          errores:     this.errores,
+          intentos:    this.aciertos + this.errores,
+          duracion_seg,
+        },
+      },
     }));
   }
 

@@ -255,10 +255,10 @@ async function iniciarMinijuego() {
     actualizarPuntajeHUD(0);
     area.innerHTML = '';
     mostrarPantalla('screen-minijuego');
-    Estado.destruirMinijuego = iniciarNivel(area, datos, (puntaje) => {
+    Estado.destruirMinijuego = iniciarNivel(area, datos, (puntaje, metricas) => {
       Estado.destruirMinijuego = null;
       screenMg.classList.remove('modo-atrapa-ranas');
-      manejarNivelCompletado(puntaje);
+      manejarNivelCompletado(puntaje, metricas);
     });
     return;
   }
@@ -279,7 +279,7 @@ async function iniciarMinijuego() {
     Estado.motorActivo = new MotorPuzzle(area, datos, actualizarPuntajeHUD);
   }
 
-  area.addEventListener('nivel_completado', e => manejarNivelCompletado(e.detail.puntaje), { once: true });
+  area.addEventListener('nivel_completado', e => manejarNivelCompletado(e.detail.puntaje, e.detail.metricas), { once: true });
 }
 
 function actualizarPuntajeHUD(pts) {
@@ -327,16 +327,17 @@ async function pedirPistaIA() {
 }
 
 // ── PANTALLA 6: Resultado ────────────────────────────────────────────────────
-async function manejarNivelCompletado(puntaje) {
+async function manejarNivelCompletado(puntaje, metricas) {
   actualizarFondo('bg-victoria');
   const pts = Math.max(0, puntaje);
 
-  // Guardar puntaje en el servidor
+  // Guardar puntaje y métricas en el servidor
   await api('POST', '/api/progreso/guardar', {
     estudiante_id: Estado.estudiante.id,
     materia: Estado.materiaActiva,
     nivel: Estado.nivelActivo,
     puntaje: pts,
+    metricas: metricas || {},
   });
 
   await cargarProgreso();

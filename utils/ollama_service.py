@@ -22,6 +22,7 @@ from data.ia_fallback import (
     clasificar_mensaje,
     obtener_respuesta_fallback,
 )
+from data.reporte_fallback import generar_reporte_fallback
 
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
@@ -64,6 +65,21 @@ REGLAS_RESPUESTA_CORTA = (
     "Responde siempre en espanol, con tono infantil, educativo y motivador. "
     "Usa maximo 2 oraciones cortas, o 3 si es una pista. "
     "No menciones detalles tecnicos, Ollama, modelos ni errores internos."
+)
+
+SYSTEM_PROMPT_DOCENTE = (
+    "Eres un asistente pedagogico para docentes de educacion primaria. "
+    "Analizas datos de desempeno estudiantil y generas informes claros sobre "
+    "las principales dificultades de los estudiantes, con recomendaciones "
+    "pedagogicas concretas para mejorar el aprendizaje. "
+    "No uses lenguaje infantil. Sé preciso y util para el docente."
+)
+
+REGLAS_REPORTE_DOCENTE = (
+    "Responde en espanol con tono profesional y directo, dirigido a un docente de primaria. "
+    "Usa parrafos cortos. Maximo 300 palabras. "
+    "Se especifico: menciona las materias y temas debiles por nombre. "
+    "No menciones Ollama, modelos ni detalles tecnicos."
 )
 
 
@@ -360,16 +376,22 @@ class ServicioIA:
         contexto_materia: str = "",
         contexto_nivel: int = 0,
         contexto_nivel_info: dict | None = None,
+        system_prompt_override: str | None = None,
+        max_tokens: int | None = None,
+        normalizar: bool = True,
     ) -> str | None:
-        system_prompt = SYSTEM_PROMPTS.get(personaje, SYSTEM_PROMPT_GENERICO)
-        contexto_extra = self._construir_contexto_nivel(
-            contexto_materia,
-            contexto_nivel,
-            contexto_nivel_info,
-        )
-        if contexto_extra:
-            system_prompt = f"{system_prompt} Contexto del nivel: {contexto_extra}"
-        system_prompt = f"{system_prompt} {REGLAS_RESPUESTA_CORTA}"
+        if system_prompt_override:
+            system_prompt = system_prompt_override
+        else:
+            system_prompt = SYSTEM_PROMPTS.get(personaje, SYSTEM_PROMPT_GENERICO)
+            contexto_extra = self._construir_contexto_nivel(
+                contexto_materia,
+                contexto_nivel,
+                contexto_nivel_info,
+            )
+            if contexto_extra:
+                system_prompt = f"{system_prompt} Contexto del nivel: {contexto_extra}"
+            system_prompt = f"{system_prompt} {REGLAS_RESPUESTA_CORTA}"
 
         payload = {
             "model": self.modelo,
@@ -380,7 +402,7 @@ class ServicioIA:
             "stream": False,
             "options": {
                 "temperature": TEMPERATURA,
-                "num_predict": MAX_TOKENS,
+                "num_predict": max_tokens if max_tokens is not None else MAX_TOKENS,
                 "top_p": 0.9,
                 "repeat_penalty": 1.1,
             },
@@ -398,8 +420,9 @@ class ServicioIA:
                 resultado = json.loads(resp.read().decode("utf-8"))
                 contenido = resultado.get("message", {}).get("content", "").strip()
                 if contenido:
-                    contenido = self._normalizar_respuesta(contenido)
-                    print(f"[IA] Respuesta Ollama ({personaje}): {contenido[:80]}...")
+                    if normalizar:
+                        contenido = self._normalizar_respuesta(contenido)
+                    print(f"[IA] Respuesta Ollama ({personaje or 'docente'}): {contenido[:80]}...")
                     return contenido
                 self._ultimo_error = "Ollama respondio sin contenido."
                 return None
@@ -419,12 +442,107 @@ class ServicioIA:
             self._ultimo_error = "No pude conectar con Ollama; usare modo de respaldo."
             return None
 
+    def generar_reporte_docente(
+        self,
+        desempeno: dict,
+        ambito: str,
+        nombre: str = '',
+    ) -> dict:
+        """
+        Genera un reporte pedagógico para el docente a partir del desempeño
+        calculado por la base de datos.
+        Si Ollama no está disponible, usa el análisis determinista offline.
+
+        Args:
+            desempeno: dict de obtener_desempeno_estudiante() o obtener_desempeno_clase().
+            ambito:    'estudiante' | 'clase'
+            nombre:    Nombre del estudiante (solo para ámbito 'estudiante').
+        """
+        if not self.verificar_disponibilidad():
+            reporte = generar_reporte_fallback(desempeno, ambito)
+            return {
+                "respuesta":  reporte,
+                "fuente":     "fallback",
+                "modelo":     self.modelo,
+                "disponible": False,
+                "error":      self._ultimo_error,
+            }
+
+        resumen = _construir_resumen_desempeno(desempeno, ambito, nombre)
+        prompt = (
+            f"Analiza el siguiente desempeno estudiantil y genera un reporte "
+            f"pedagogico para el docente:\n\n{resumen}\n\n"
+            f"Incluye: diagnostico de dificultades, fortalezas observadas "
+            f"y 3 recomendaciones pedagogicas especificas."
+        )
+        system = f"{SYSTEM_PROMPT_DOCENTE} {REGLAS_REPORTE_DOCENTE}"
+
+        respuesta = self._llamar_ollama(
+            personaje="",
+            mensaje=prompt,
+            system_prompt_override=system,
+            max_tokens=400,
+            normalizar=False,
+        )
+
+        if respuesta:
+            return {
+                "respuesta":  respuesta,
+                "fuente":     "ollama",
+                "modelo":     self.modelo,
+                "disponible": True,
+                "error":      "",
+            }
+
+        reporte = generar_reporte_fallback(desempeno, ambito)
+        return {
+            "respuesta":  reporte,
+            "fuente":     "fallback",
+            "modelo":     self.modelo,
+            "disponible": False,
+            "error":      self._ultimo_error,
+        }
+
     def _normalizar_respuesta(self, texto: str) -> str:
         limpio = " ".join(str(texto).split())
         partes = _separar_oraciones(limpio)
         if len(partes) > 3:
             return " ".join(partes[:3])
         return limpio
+
+
+def _construir_resumen_desempeno(desempeno: dict, ambito: str, nombre: str = '') -> str:
+    """Genera texto resumido del desempeño para incluir en el prompt de Ollama."""
+    lineas = []
+
+    if ambito == 'clase':
+        total = desempeno.get('total_estudiantes', 0)
+        lineas.append(f"Clase completa ({total} estudiantes):")
+    else:
+        nom = nombre or desempeno.get('nombre', 'Estudiante')
+        lineas.append(f"Estudiante: {nom}")
+
+    por_materia = desempeno.get('por_materia', {})
+    if por_materia:
+        lineas.append("Desempeno por materia (promedio/100):")
+        for mat, d in sorted(por_materia.items(), key=lambda x: x[1].get('promedio_puntaje', 0)):
+            prom = d.get('promedio_puntaje', 0)
+            niv  = d.get('niveles_completados') or d.get('estudiantes') or 0
+            terr = d.get('tasa_error', 0)
+            lineas.append(f"  - {mat}: {prom:.0f}/100, {niv} niveles, tasa error {terr:.0%}")
+
+    por_tema = desempeno.get('por_tema', {})
+    if por_tema:
+        temas_bajos = {t: d for t, d in por_tema.items() if d.get('promedio_puntaje', 100) < 60}
+        if temas_bajos:
+            lineas.append("Temas con mayor dificultad (promedio < 60):")
+            for tema, d in sorted(temas_bajos.items(), key=lambda x: x[1].get('promedio_puntaje', 100)):
+                lineas.append(f"  - {tema}: {d.get('promedio_puntaje', 0):.0f}/100")
+
+    if not por_materia:
+        lineas.append("Sin datos de desempeno registrados aun.")
+
+    return '\n'.join(lineas)
 
 
 def _separar_oraciones(texto: str) -> list[str]:

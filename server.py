@@ -19,6 +19,11 @@ from utils.database import (
     contar_niveles_completados,
     obtener_puntajes_por_materia,
     obtener_mejor_puntaje,
+    listar_estudiantes,
+    obtener_desempeno_estudiante,
+    obtener_desempeno_clase,
+    obtener_reporte_cacheado,
+    guardar_reporte,
 )
 from data.niveles_contenido import obtener_datos_nivel_completo
 
@@ -28,6 +33,10 @@ app = Flask(__name__, static_folder="static", template_folder="templates")
 inicializar_base_de_datos()
 
 MATERIAS = ["matematicas", "lenguaje", "ingles", "biologia"]
+
+# PIN del panel docente: configurable vía variable de entorno DOCENTE_PIN.
+# Por defecto "1234" — cambiar en producción.
+DOCENTE_PIN = os.getenv("DOCENTE_PIN", "1234")
 IA_NIVELES_HABILITADOS = {
     materia: {1, 2, 3, 4, 5} for materia in MATERIAS
 }
@@ -52,6 +61,12 @@ def _leer_entero(valor, por_defecto=0):
         return int(valor)
     except (TypeError, ValueError):
         return por_defecto
+
+
+def _verificar_pin(req) -> bool:
+    """Comprueba el PIN docente enviado en el header X-Docente-Pin."""
+    pin = (req.headers.get("X-Docente-Pin") or "").strip()
+    return pin == DOCENTE_PIN
 
 
 def _ia_habilitada_para_nivel(materia, nivel):
@@ -132,14 +147,31 @@ def get_progreso(estudiante_id):
 
 @app.route("/api/progreso/guardar", methods=["POST"])
 def guardar_progreso():
-    """Guarda el puntaje de un nivel. Body: {estudiante_id, materia, nivel, puntaje}"""
+    """
+    Guarda el desempeño de un nivel.
+    Body: {estudiante_id, materia, nivel, puntaje, metricas?}
+    metricas: {aciertos, errores, intentos, duracion_seg}
+    """
     datos = request.get_json(silent=True) or {}
     try:
+        materia  = datos["materia"]
+        nivel    = int(datos["nivel"])
+        metricas = datos.get("metricas") or {}
+
+        # Resolver el tema del nivel desde el contenido pedagógico
+        nivel_info = obtener_datos_nivel_completo(materia, nivel)
+        tema = nivel_info.get("tema", "") if nivel_info else ""
+
         guardar_puntaje(
             int(datos["estudiante_id"]),
-            datos["materia"],
-            int(datos["nivel"]),
+            materia,
+            nivel,
             int(datos["puntaje"]),
+            aciertos=int(metricas.get("aciertos", 0)),
+            errores=int(metricas.get("errores", 0)),
+            intentos=int(metricas.get("intentos", 0)),
+            duracion_seg=int(metricas.get("duracion_seg", 0)),
+            tema=tema,
         )
         return jsonify({"ok": True})
     except (KeyError, ValueError) as e:
@@ -264,6 +296,88 @@ def ia_retroalimentacion():
         contexto_nivel_info=contexto_nivel,
     )
     return jsonify(resultado)
+
+
+# ── API: Panel Docente ────────────────────────────────────────────────────────
+
+@app.route("/api/docente/login", methods=["POST"])
+def docente_login():
+    """
+    Valida el PIN docente. El PIN se envía también en X-Docente-Pin header.
+    Responde {ok: true} si correcto, 401 si incorrecto.
+    """
+    if _verificar_pin(request):
+        return jsonify({"ok": True})
+    return jsonify({"error": "PIN incorrecto"}), 401
+
+
+@app.route("/api/docente/estudiantes")
+def docente_estudiantes():
+    """Lista todos los estudiantes con resumen de progreso."""
+    if not _verificar_pin(request):
+        return jsonify({"error": "PIN incorrecto"}), 401
+    return jsonify({"estudiantes": listar_estudiantes()})
+
+
+@app.route("/api/docente/reporte/estudiante/<int:estudiante_id>", methods=["POST"])
+def docente_reporte_estudiante(estudiante_id):
+    """
+    Devuelve el reporte IA del estudiante. Si ya hay uno cacheado lo usa,
+    a menos que se pase ?regenerar=1.
+    """
+    if not _verificar_pin(request):
+        return jsonify({"error": "PIN incorrecto"}), 401
+
+    regenerar = request.args.get("regenerar") == "1"
+
+    if not regenerar:
+        cache = obtener_reporte_cacheado("estudiante", estudiante_id)
+        if cache:
+            return jsonify({
+                "reporte": cache["contenido"],
+                "fuente":  cache["fuente"],
+                "fecha":   cache["fecha"],
+            })
+
+    desempeno = obtener_desempeno_estudiante(estudiante_id)
+    resultado = servicio_ia.generar_reporte_docente(
+        desempeno, "estudiante", nombre=desempeno.get("nombre", "")
+    )
+    guardar_reporte("estudiante", resultado["respuesta"], resultado["fuente"], estudiante_id)
+
+    return jsonify({
+        "reporte": resultado["respuesta"],
+        "fuente":  resultado["fuente"],
+    })
+
+
+@app.route("/api/docente/reporte/clase", methods=["POST"])
+def docente_reporte_clase():
+    """
+    Devuelve el reporte IA de la clase completa. Cache a menos de ?regenerar=1.
+    """
+    if not _verificar_pin(request):
+        return jsonify({"error": "PIN incorrecto"}), 401
+
+    regenerar = request.args.get("regenerar") == "1"
+
+    if not regenerar:
+        cache = obtener_reporte_cacheado("clase")
+        if cache:
+            return jsonify({
+                "reporte": cache["contenido"],
+                "fuente":  cache["fuente"],
+                "fecha":   cache["fecha"],
+            })
+
+    desempeno = obtener_desempeno_clase()
+    resultado = servicio_ia.generar_reporte_docente(desempeno, "clase")
+    guardar_reporte("clase", resultado["respuesta"], resultado["fuente"])
+
+    return jsonify({
+        "reporte": resultado["respuesta"],
+        "fuente":  resultado["fuente"],
+    })
 
 
 if __name__ == "__main__":

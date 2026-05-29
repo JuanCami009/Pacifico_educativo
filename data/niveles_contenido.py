@@ -2,6 +2,8 @@
 niveles_contenido.py - Definición de contenidos pedagógicos.
 Contiene los 20 niveles del juego Pacífico Educativo organizados por materia.
 No contiene lógica, solo la estructura de datos que consumirán los minijuegos.
+El campo 'tema' identifica el concepto pedagógico central del nivel para el
+análisis de desempeño del panel docente.
 """
 
 # Lista de todos los niveles del juego
@@ -13,6 +15,7 @@ TODOS_LOS_NIVELES = [
         "materia": "matematicas",
         "nivel": 1,
         "nombre": "Los cangrejos del manglar",
+        "tema": "conteo",
         "personaje": "El Riviel",
         "frase_intro": (
             "Naveguemos juntos por el río... "
@@ -38,6 +41,7 @@ TODOS_LOS_NIVELES = [
         "materia": "matematicas",
         "nivel": 2,
         "nombre": "Pesca Abundante",
+        "tema": "suma",
         "personaje": "El Riviel",
         "frase_intro": "¿Sabes sumar? Ayúdame a organizar la pesca en las canoas correctas.",
         "minijuego": "drag_and_drop",
@@ -60,6 +64,7 @@ TODOS_LOS_NIVELES = [
         "materia": "matematicas",
         "nivel": 3,
         "nombre": "El Misterio de la Marea",
+        "tema": "resta",
         "personaje": "El Riviel",
         "frase_intro": "La marea se llevó algunos caracoles. Completa la resta para saber cuántos quedan.",
         "minijuego": "puzzle",
@@ -70,8 +75,8 @@ TODOS_LOS_NIVELES = [
             "imagen_base": "assets/images/ui/resta_5_menos_2.png",
             "piezas": [
                 {"imagen": "assets/images/ui/num_3.png", "texto": "3", "posicion": (400, 350)},
-                {"imagen": "assets/images/ui/num_4.png", "texto": "4", "posicion": (100, 100)}, # Incorrecta (usada como trampa visual si soporta)
-                {"imagen": "assets/images/ui/num_2.png", "texto": "2", "posicion": (100, 500)}  # Incorrecta
+                {"imagen": "assets/images/ui/num_4.png", "texto": "4", "posicion": (100, 100)},
+                {"imagen": "assets/images/ui/num_2.png", "texto": "2", "posicion": (100, 500)}
             ]
         }
     },
@@ -79,6 +84,7 @@ TODOS_LOS_NIVELES = [
         "materia": "matematicas",
         "nivel": 4,
         "nombre": "El Tesoro Multiplicado",
+        "tema": "multiplicacion",
         "personaje": "El Riviel",
         "frase_intro": "Mira todas estas conchas brillantes. Encuentra los grupos que forman un 2x3.",
         "minijuego": "point_and_click",
@@ -98,6 +104,7 @@ TODOS_LOS_NIVELES = [
         "materia": "matematicas",
         "nivel": 5,
         "nombre": "El Reparto en el Pueblo",
+        "tema": "division",
         "personaje": "El Riviel",
         "frase_intro": "Hoy fue un gran día de pesca. Ayuda a repartir los peces en las canastas por igual.",
         "minijuego": "drag_and_drop",
@@ -124,6 +131,7 @@ TODOS_LOS_NIVELES = [
         "materia": "lenguaje",
         "nivel": 1,
         "nombre": "Voces del Bosque",
+        "tema": "vocales",
         "personaje": "La Tunda",
         "frase_intro": "Escucha las vocales que el viento trae... toca las imágenes que empiecen con 'A'.",
         "minijuego": "point_and_click",
@@ -143,6 +151,7 @@ TODOS_LOS_NIVELES = [
         "materia": "lenguaje",
         "nivel": 2,
         "nombre": "Armando el Currulao",
+        "tema": "silabas",
         "personaje": "La Tunda",
         "frase_intro": "Las palabras bailan como el agua. Únelas para formar palabras de nuestra tierra.",
         "minijuego": "drag_and_drop",
@@ -165,6 +174,7 @@ TODOS_LOS_NIVELES = [
         "materia": "lenguaje",
         "nivel": 3,
         "nombre": "El Nombre Perdido",
+        "tema": "palabras",
         "personaje": "La Tunda",
         "frase_intro": "A este animal se le borró una sílaba de su nombre. ¡Ayúdalo a recordarla!",
         "minijuego": "puzzle",
@@ -182,6 +192,7 @@ TODOS_LOS_NIVELES = [
         "materia": "lenguaje",
         "nivel": 4,
         "nombre": "Historias del Río",
+        "tema": "oraciones",
         "personaje": "La Tunda",
         "frase_intro": "Ordena estas palabras para contar una hermosa historia sobre nuestro río.",
         "minijuego": "puzzle",
@@ -199,6 +210,7 @@ TODOS_LOS_NIVELES = [
         "materia": "lenguaje",
         "nivel": 5,
         "nombre": "Secretos de la Selva",
+        "tema": "vocabulario",
         "personaje": "La Tunda",
         "frase_intro": "Observa con atención la imagen y responde a mis preguntas tocando la respuesta.",
         "minijuego": "point_and_click",
@@ -220,6 +232,7 @@ TODOS_LOS_NIVELES = [
         "materia": "ingles",
         "nivel": 1,
         "nombre": "Colors of the Jungle",
+        "tema": "colores",
         "personaje": "El Duende",
         "frase_intro": "Hello my friend! Hoy vamos a aprender colores. Toca todos los objetos BLUE (Azules).",
         "minijuego": "point_and_click",
@@ -238,6 +251,7 @@ TODOS_LOS_NIVELES = [
         "materia": "ingles",
         "nivel": 2,
         "nombre": "Animals Vocabulary",
+        "tema": "animales",
         "personaje": "El Duende",
         "frase_intro": "¿Cómo se llaman nuestros animales en inglés? Únelos con su nombre correcto.",
         "minijuego": "drag_and_drop",
@@ -260,6 +274,7 @@ TODOS_LOS_NIVELES = [
         "materia": "ingles",
         "nivel": 3,
         "nombre": "Counting in English",
+        "tema": "numeros",
         "personaje": "El Duende",
         "frase_intro": "One, two, three... ¡A contar! Toca los grupos que tienen THREE (3) animales.",
         "minijuego": "point_and_click",
@@ -278,6 +293,7 @@ TODOS_LOS_NIVELES = [
         "materia": "ingles",
         "nivel": 4,
         "nombre": "A Friendly Greeting",
+        "tema": "saludos",
         "personaje": "El Duende",
         "frase_intro": "¿Cómo decimos 'Buenos días'? Ordena las palabras para formar el saludo.",
         "minijuego": "puzzle",
@@ -294,6 +310,7 @@ TODOS_LOS_NIVELES = [
         "materia": "ingles",
         "nivel": 5,
         "nombre": "The River Environment",
+        "tema": "vocabulario_ingles",
         "personaje": "El Duende",
         "frase_intro": "Let's find the RIVER! Observa el paisaje y toca lo que te pido en inglés.",
         "minijuego": "point_and_click",
@@ -316,6 +333,7 @@ TODOS_LOS_NIVELES = [
         "materia": "biologia",
         "nivel": 1,
         "nombre": "Flora y Fauna",
+        "tema": "clasificacion",
         "personaje": "La Madre de Agua",
         "frase_intro": "Soy la guardiana de la vida. Ayúdame a separar los animales de las plantas mágicas.",
         "minijuego": "drag_and_drop",
@@ -338,6 +356,7 @@ TODOS_LOS_NIVELES = [
         "materia": "biologia",
         "nivel": 2,
         "nombre": "Anatomía del Río",
+        "tema": "anatomia",
         "personaje": "La Madre de Agua",
         "frase_intro": "A este hermoso tucán le faltan sus alas para volar. ¡Devuélvele su forma!",
         "minijuego": "puzzle",
@@ -355,6 +374,7 @@ TODOS_LOS_NIVELES = [
         "materia": "biologia",
         "nivel": 3,
         "nombre": "El Ecosistema Oculto",
+        "tema": "ecosistema",
         "personaje": "La Madre de Agua",
         "frase_intro": "El manglar está incompleto sin sus raíces en el agua. Arma la escena de la vida.",
         "minijuego": "puzzle",
@@ -372,6 +392,7 @@ TODOS_LOS_NIVELES = [
         "materia": "biologia",
         "nivel": 4,
         "nombre": "La Cadena de la Vida",
+        "tema": "cadena_alimenticia",
         "personaje": "La Madre de Agua",
         "frase_intro": "La energía fluye en el río. Ordena quién se alimenta de quién para mantener el equilibrio.",
         "minijuego": "puzzle",
@@ -389,6 +410,7 @@ TODOS_LOS_NIVELES = [
         "materia": "biologia",
         "nivel": 5,
         "nombre": "Guardianes del Agua",
+        "tema": "conservacion",
         "personaje": "La Madre de Agua",
         "frase_intro": "Nuestro deber es cuidar el Pacífico. Señala las acciones que protegen el agua limpia.",
         "minijuego": "point_and_click",
@@ -404,6 +426,7 @@ TODOS_LOS_NIVELES = [
         }
     }
 ]
+
 
 def obtener_datos_nivel_completo(materia, nivel):
     """
