@@ -62,7 +62,7 @@ class MotorPuzzle {
       const slot = document.createElement('div');
       slot.className = 'puzzle-slot';
       slot.dataset.idx = i;
-      slot.innerHTML = `<span style="opacity:0.4"><i class="fa-solid fa-shapes"></i></span>`;
+      slot.innerHTML = `<span class="puzzle-slot-empty"><i class="fa-solid fa-shapes"></i></span>`;
       this.slots.push(slot);
       filaSlots.appendChild(slot);
     }
@@ -83,10 +83,12 @@ class MotorPuzzle {
       card.className = 'puzzle-tarjeta';
       card.dataset.idxReal = tarjetasOriginales.indexOf(t);
       
-      // Icono de la tarjeta con FontAwesome
-      const icon = document.createElement('i');
-      icon.className = this._iconPorNombre(t.texto || t.nombre || '');
-      card.appendChild(icon);
+      // Icono SVG local del Pacífico (o texto si es palabra/sílaba)
+      const nombreIcono = t.texto || t.nombre || '';
+      const iconWrap = document.createElement('div');
+      iconWrap.className = 'puzzle-card-icon';
+      iconWrap.innerHTML = this._renderTarjeta(nombreIcono);
+      card.appendChild(iconWrap);
 
       const txt = document.createElement('span');
       txt.textContent = t.texto || t.nombre || `Item ${i+1}`;
@@ -180,7 +182,7 @@ class MotorPuzzle {
 
       const icon = document.createElement('div');
       icon.className = 'pieza-drag-icon';
-      icon.innerHTML = `<i class="${this._iconPorNombre(pieza.texto || pieza.nombre)}"></i>`;
+      icon.innerHTML = this._renderTarjeta(pieza.texto || pieza.nombre || '');
       el.appendChild(icon);
 
       const text = document.createElement('span');
@@ -198,7 +200,7 @@ class MotorPuzzle {
       const slot = document.createElement('div');
       slot.className = 'puzzle-slot';
       slot.dataset.slotId = slotId;
-      slot.innerHTML = `<span style="opacity:0.4"><i class="fa-solid fa-shapes"></i></span>`;
+      slot.innerHTML = `<span class="puzzle-slot-empty"><i class="fa-solid fa-shapes"></i></span>`;
       
       slot.addEventListener('dragover', e => { 
         e.preventDefault(); 
@@ -261,53 +263,25 @@ class MotorPuzzle {
     }));
   }
 
-  /** Devuelve una clase de FontAwesome representativa según el nombre del elemento */
-  _iconPorNombre(nombre) {
-    const mapa = {
-      // Ciclo mariposa
-      huevo: 'fa-solid fa-egg',
-      oruga: 'fa-solid fa-bug',
-      crisalida: 'fa-solid fa-box',
-      crisálida: 'fa-solid fa-box',
-      mariposa: 'fa-solid fa-bugs',
-      
-      // Sombrero / Tejer
-      'remojar': 'fa-solid fa-droplet',
-      'tinturar': 'fa-solid fa-palette',
-      'tejer': 'fa-solid fa-hands',
-      
-      // Números / Ordinales
-      'first': 'fa-solid fa-1',
-      'second': 'fa-solid fa-2',
-      'third': 'fa-solid fa-3',
-      'fourth': 'fa-solid fa-4',
-    };
+  /**
+   * Renderiza el contenido visual de una tarjeta/pieza del puzzle.
+   *  - Si el texto es una palabra/sílaba pura (sólo letras) → tipografía grande,
+   *    sin ícono (muy útil para Lenguaje "EL RÍO ES VIDA" o sílabas RIM/TA/GLAR).
+   *  - Si el texto tiene un número al inicio (ej. "1. Sol") → ícono SVG del
+   *    sustantivo + el número visible.
+   *  - En cualquier otro caso → ícono SVG del concepto.
+   */
+  _renderTarjeta(texto) {
+    const t = (texto || '').toString().trim();
+    if (!t) return PacificIcons.get('brillo');
 
-    const normalized = nombre.toLowerCase().trim();
-    
-    // Buscar coincidencia exacta
-    for (const key in mapa) {
-      if (normalized.includes(key)) {
-        return mapa[key];
-      }
+    // Sólo letras (con tildes/ñ) y espacios → es una palabra a leer
+    if (/^[a-záéíóúñ ]+$/i.test(t) && t.length <= 14) {
+      return `<span class="puzzle-card-texto">${t}</span>`;
     }
-
-    // Fallbacks
-    if (normalized.includes('1') || normalized.includes('uno') || normalized.includes('primer')) return 'fa-solid fa-1';
-    if (normalized.includes('2') || normalized.includes('dos') || normalized.includes('segund')) return 'fa-solid fa-2';
-    if (normalized.includes('3') || normalized.includes('tres') || normalized.includes('tercer')) return 'fa-solid fa-3';
-    if (normalized.includes('4') || normalized.includes('cuatro') || normalized.includes('cuart')) return 'fa-solid fa-4';
-    if (normalized.includes('5') || normalized.includes('cinco') || normalized.includes('quint')) return 'fa-solid fa-5';
-    
-    if (normalized.includes('huevo') || normalized.includes('egg')) return 'fa-solid fa-egg';
-    if (normalized.includes('oruga') || normalized.includes('insecto') || normalized.includes('bug')) return 'fa-solid fa-bug';
-    if (normalized.includes('mariposa') || normalized.includes('butterfly')) return 'fa-solid fa-bugs';
-    if (normalized.includes('agua') || normalized.includes('remojar') || normalized.includes('lavar')) return 'fa-solid fa-droplet';
-    if (normalized.includes('color') || normalized.includes('tinta') || normalized.includes('pintar')) return 'fa-solid fa-palette';
-    
-    // Letras/Sílaba corta
-    if (normalized.length <= 5) return 'fa-solid fa-font';
-
-    return 'fa-solid fa-square-poll-horizontal';
+    // Patrón "1. Sol" / "2. Planta" → quita el prefijo numérico para escoger ícono
+    const m = t.match(/^\s*\d+\s*[\.\)\-:]\s*(.+)$/);
+    const concepto = m ? m[1] : t;
+    return PacificIcons.get(concepto);
   }
 }

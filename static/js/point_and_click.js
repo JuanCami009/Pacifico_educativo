@@ -35,13 +35,10 @@ class MotorPointClick {
       el.className = 'game-item';
       el.dataset.correcto = item.es_correcto;
 
-      // Icon wrapper con FontAwesome en lugar de emojis o imágenes rotas
+      // Ícono SVG local del Pacífico (con contador si el nombre es "N <cosa>")
       const iconWrapper = document.createElement('div');
       iconWrapper.className = 'game-item-icon-wrapper';
-      
-      const icon = document.createElement('i');
-      icon.className = this._iconPorNombre(item.nombre);
-      iconWrapper.appendChild(icon);
+      iconWrapper.innerHTML = this._renderIcon(item.nombre);
       el.appendChild(iconWrapper);
 
       const label = document.createElement('div');
@@ -110,71 +107,23 @@ class MotorPointClick {
     }));
   }
 
-  /** Devuelve una clase de FontAwesome representativa según el nombre del item */
-  _iconPorNombre(nombre) {
-    const mapa = {
-      // Animales/Flora
-      cangrejo: 'fa-solid fa-shrimp',
-      pez: 'fa-solid fa-fish',
-      pez_azul: 'fa-solid fa-fish',
-      pez_rojo: 'fa-solid fa-fish',
-      rana: 'fa-solid fa-frog',
-      rana_verde: 'fa-solid fa-frog',
-      ave: 'fa-solid fa-crow',
-      mono: 'fa-solid fa-paw',
-      ballena: 'fa-solid fa-water',
-      insecto: 'fa-solid fa-bug',
-      sol: 'fa-solid fa-sun',
-      hoja: 'fa-solid fa-leaf',
-      palma: 'fa-solid fa-tree',
-      arbol: 'fa-solid fa-tree',
-      flor: 'fa-solid fa-seedling',
-      flor_roja: 'fa-solid fa-seedling',
-      mariposa_azul: 'fa-solid fa-bugs',
-      
-      // Objetos/Elementos
-      piedra: 'fa-solid fa-circle',
-      agua: 'fa-solid fa-droplet',
-      reciclar: 'fa-solid fa-recycle',
-      sembrar_arbol: 'fa-solid fa-seedling',
-      basura_rio: 'fa-solid fa-trash-can',
-      talar_arbol: 'fa-solid fa-scissors',
-      canoa: 'fa-solid fa-ship',
-      barco_metal: 'fa-solid fa-ship',
-      submarino: 'fa-solid fa-compass',
-      
-      // English Counting
-      'three frogs': 'fa-solid fa-frog',
-      'two frogs': 'fa-solid fa-frog',
-      'four frogs': 'fa-solid fa-frog',
-      '3ranas': 'fa-solid fa-frog',
-      '3ranas_b': 'fa-solid fa-frog',
-      '2ranas': 'fa-solid fa-frog',
-      '4ranas': 'fa-solid fa-frog',
-      
-      // Backgrounds
-      river: 'fa-solid fa-water',
-      mountain: 'fa-solid fa-mountain',
-      sky: 'fa-solid fa-cloud',
-      rio_1: 'fa-solid fa-water',
-      rio_2: 'fa-solid fa-water',
-      montana: 'fa-solid fa-mountain',
-      cielo: 'fa-solid fa-cloud',
-    };
-
-    const normalized = nombre.toLowerCase().trim();
-    if (mapa[normalized]) return mapa[normalized];
-    
-    // Fallbacks genéricos
-    if (normalized.includes('pez') || normalized.includes('fish')) return 'fa-solid fa-fish';
-    if (normalized.includes('rana') || normalized.includes('frog')) return 'fa-solid fa-frog';
-    if (normalized.includes('árbol') || normalized.includes('arbol') || normalized.includes('tree')) return 'fa-solid fa-tree';
-    if (normalized.includes('agua') || normalized.includes('río') || normalized.includes('rio') || normalized.includes('river')) return 'fa-solid fa-droplet';
-    if (normalized.includes('basura') || normalized.includes('trash')) return 'fa-solid fa-trash-can';
-    if (normalized.includes('canoa') || normalized.includes('barco') || normalized.includes('bote') || normalized.includes('boat')) return 'fa-solid fa-ship';
-    if (normalized.includes('flor') || normalized.includes('sembrar') || normalized.includes('planta') || normalized.includes('flower')) return 'fa-solid fa-seedling';
-    if (normalized.includes('mariposa') || normalized.includes('butterfly')) return 'fa-solid fa-bugs';
-    
-    return 'fa-solid fa-circle-question';
+  /**
+   * Renderiza un ícono. Si el nombre empieza con un número (ej. "3 peces",
+   * "three frogs", "6 conchas"), genera un grupo de N íconos del concepto
+   * — clave para que niveles como contar ranas / conchas se vean reales.
+   */
+  _renderIcon(nombre) {
+    const n = (nombre || '').toLowerCase().trim();
+    const palabras = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9 };
+    let count = 0;
+    let resto = n;
+    const mNum = n.match(/^(\d+)\s+(.+)$/);
+    const mWord = n.match(/^(one|two|three|four|five|six|seven|eight|nine)\s+(.+)$/);
+    if (mNum) { count = parseInt(mNum[1]); resto = mNum[2]; }
+    else if (mWord) { count = palabras[mWord[1]]; resto = mWord[2]; }
+    if (count > 1 && count <= 9) {
+      return PacificIcons.getGroup(resto, count);
+    }
+    return PacificIcons.get(nombre);
   }
 }

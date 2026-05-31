@@ -123,6 +123,28 @@ def login():
     return jsonify(dict(estudiante))
 
 
+@app.route("/api/estudiantes")
+def get_estudiantes():
+    """Lista todos los estudiantes con resumen de progreso (para la pantalla de login)."""
+    estudiantes = listar_estudiantes()
+    return jsonify(estudiantes)
+
+
+@app.route("/api/progreso/reset", methods=["POST"])
+def reset_progreso():
+    """Borra todo el progreso de un estudiante para que comience desde cero."""
+    datos = request.get_json(silent=True) or {}
+    estudiante_id = datos.get("estudiante_id")
+    if not estudiante_id:
+        return jsonify({"error": "estudiante_id requerido"}), 400
+    from utils.database import obtener_conexion
+    con = obtener_conexion()
+    con.execute("DELETE FROM progreso WHERE estudiante_id = ?", (int(estudiante_id),))
+    con.commit()
+    con.close()
+    return jsonify({"ok": True})
+
+
 # ── API: Progreso ────────────────────────────────────────────────────────────
 
 @app.route("/api/progreso/<int:estudiante_id>")

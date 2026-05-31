@@ -48,6 +48,15 @@ const ICONOS_UI = {
 
 // ── Navegación de pantallas ──────────────────────────────────────────────────
 function mostrarPantalla(id) {
+  Estado.pantallaActual = id;
+  if (Estado.estudiante) {
+    localStorage.setItem('pacifico_estado_v2', JSON.stringify({
+      estudiante: Estado.estudiante,
+      materiaActiva: Estado.materiaActiva,
+      nivelActivo: Estado.nivelActivo,
+      pantallaActual: id
+    }));
+  }
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById(id);
   if (el) el.classList.add('active');
@@ -62,7 +71,8 @@ function actualizarFondo(clase) {
   const fondos = [
     'bg-intro', 'bg-menu', 'bg-victoria',
     'bg-niveles-matematicas', 'bg-niveles-lenguaje', 'bg-niveles-ingles', 'bg-niveles-biologia',
-    'bg-juego-matematicas', 'bg-juego-lenguaje', 'bg-juego-ingles', 'bg-juego-biologia'
+    'bg-juego-matematicas', 'bg-juego-matematicas-2', 'bg-juego-matematicas-3', 'bg-juego-matematicas-4', 'bg-juego-matematicas-5', 
+    'bg-juego-lenguaje', 'bg-juego-ingles', 'bg-juego-biologia'
   ];
   document.body.classList.remove(...fondos);
   document.body.classList.add(clase);
@@ -88,8 +98,99 @@ async function api(metodo, ruta, cuerpo) {
 }
 
 // ── PANTALLA 1: Intro / Login ────────────────────────────────────────────────
+function irALogin() {
+  localStorage.removeItem('pacifico_estado_v2');
+  window.location.reload();
+}
+
+async function cargarUsuariosGuardados() {
+  try {
+    const lista = await api('GET', '/api/estudiantes');
+    const panel = document.getElementById('usuarios-guardados');
+    const contenedor = document.getElementById('usuarios-lista');
+    if (!lista || lista.length === 0) { panel.classList.add('hidden'); return; }
+    panel.classList.remove('hidden');
+    contenedor.innerHTML = '';
+    lista.forEach(u => {
+      const chip = document.createElement('button');
+      chip.className = 'usuario-chip';
+      chip.type = 'button';
+      const nivelesTotal = u.niveles_completados || 0;
+      chip.innerHTML = `
+        <i class="fa-solid fa-user-circle" style="color:var(--dorado);"></i>
+        <span class="usuario-chip-nombre">${u.nombre}</span>
+        <span class="usuario-chip-progreso">${nivelesTotal} nivel${nivelesTotal !== 1 ? 'es' : ''}</span>
+      `;
+      chip.addEventListener('click', () => {
+        document.getElementById('nombre-input').value = u.nombre;
+        document.getElementById('btn-entrar').click();
+      });
+      contenedor.appendChild(chip);
+    });
+  } catch(e) { /* silencio si falla */ }
+}
+
+async function mostrarModalProgreso(estudiante, progreso) {
+  const totalNiveles = Object.values(progreso).reduce((acc, m) => acc + (m.completados || 0), 0);
+  document.getElementById('modal-progreso-nombre').textContent = `¡Hola, ${estudiante.nombre}!`;
+  document.getElementById('modal-progreso-desc').textContent =
+    `Tienes ${totalNiveles} nivel${totalNiveles !== 1 ? 'es' : ''} completado${totalNiveles !== 1 ? 's' : ''} en tu aventura. ¿Quieres continuar o empezar desde cero?`;
+
+  const modal = document.getElementById('modal-progreso');
+  modal.classList.remove('hidden');
+
+  return new Promise((resolve) => {
+    const btnContinuar = document.getElementById('modal-btn-continuar');
+    const btnReiniciar = document.getElementById('modal-btn-reiniciar');
+
+    const limpiar = () => {
+      modal.classList.add('hidden');
+      btnContinuar.replaceWith(btnContinuar.cloneNode(true));
+      btnReiniciar.replaceWith(btnReiniciar.cloneNode(true));
+    };
+
+    document.getElementById('modal-btn-continuar').addEventListener('click', () => {
+      limpiar(); resolve('continuar');
+    }, { once: true });
+
+    document.getElementById('modal-btn-reiniciar').addEventListener('click', () => {
+      limpiar(); resolve('reiniciar');
+    }, { once: true });
+  });
+}
+
 function initIntro() {
+  const guardado = localStorage.getItem('pacifico_estado_v2');
+  if (guardado) {
+    try {
+      const st = JSON.parse(guardado);
+      if (st.estudiante) {
+        Estado.estudiante = st.estudiante;
+        Estado.materiaActiva = st.materiaActiva;
+        Estado.nivelActivo = st.nivelActivo;
+        Estado.pantallaActual = st.pantallaActual;
+        
+        cargarProgreso().then(async () => {
+          if (st.pantallaActual === 'screen-minijuego') {
+            await mostrarPersonaje(st.nivelActivo);
+            iniciarMinijuego();
+          } else if (st.pantallaActual === 'screen-personaje') {
+            mostrarPersonaje(st.nivelActivo);
+          } else if (st.pantallaActual === 'screen-level-select') {
+            seleccionarMateria(st.materiaActiva);
+          } else if (st.pantallaActual === 'screen-puntajes') {
+            mostrarPuntajes();
+          } else {
+            mostrarMenu();
+          }
+        });
+        return;
+      }
+    } catch(e) { console.error('Error restaurando estado:', e); }
+  }
+
   actualizarFondo('bg-intro');
+  cargarUsuariosGuardados();
   const input  = document.getElementById('nombre-input');
   const btnOk  = document.getElementById('btn-entrar');
   const errMsg = document.getElementById('intro-error');
@@ -102,12 +203,23 @@ function initIntro() {
     if (datos.error) { errMsg.textContent = datos.error; errMsg.classList.remove('hidden'); return; }
     Estado.estudiante = datos;
     await cargarProgreso();
+
+    // Comprobar si ya tiene niveles completados
+    const totalNiveles = Object.values(Estado.progreso).reduce((acc, m) => acc + (m.completados || 0), 0);
+    if (totalNiveles > 0) {
+      const decision = await mostrarModalProgreso(datos, Estado.progreso);
+      if (decision === 'reiniciar') {
+        await api('POST', '/api/progreso/reset', { estudiante_id: datos.id });
+        await cargarProgreso();
+      }
+    }
     mostrarMenu();
   }
 
   btnOk.addEventListener('click', entrar);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
 }
+
 
 // ── Cargar progreso del estudiante ──────────────────────────────────────────
 async function cargarProgreso() {
@@ -230,7 +342,11 @@ document.getElementById('btn-volver-level').addEventListener('click', () => sele
 
 // ── PANTALLA 5: Minijuego ────────────────────────────────────────────────────
 async function iniciarMinijuego() {
-  actualizarFondo(`bg-juego-${Estado.materiaActiva}`);
+  let claseFondo = `bg-juego-${Estado.materiaActiva}`;
+  if (Estado.materiaActiva === 'matematicas' && Estado.nivelActivo > 1) {
+    claseFondo = `bg-juego-matematicas-${Estado.nivelActivo}`;
+  }
+  actualizarFondo(claseFondo);
   const datos = Estado.nivelDatos;
   const area = document.getElementById('game-area');
   const minijuego = datos.minijuego;
@@ -277,6 +393,14 @@ async function iniciarMinijuego() {
     Estado.motorActivo = new MotorDragDrop(area, datos.datos, actualizarPuntajeHUD);
   } else if (minijuego === 'puzzle') {
     Estado.motorActivo = new MotorPuzzle(area, datos, actualizarPuntajeHUD);
+  } else if (minijuego === 'mate2_pesca') {
+    Estado.motorActivo = new MotorMate2(area, datos, actualizarPuntajeHUD);
+  } else if (minijuego === 'mate3_marea') {
+    Estado.motorActivo = new MotorMate3(area, datos, actualizarPuntajeHUD);
+  } else if (minijuego === 'mate4_tesoro') {
+    Estado.motorActivo = new MotorMate4(area, datos, actualizarPuntajeHUD);
+  } else if (minijuego === 'mate5_reparto') {
+    Estado.motorActivo = new MotorMate5(area, datos, actualizarPuntajeHUD);
   }
 
   area.addEventListener('nivel_completado', e => manejarNivelCompletado(e.detail.puntaje, e.detail.metricas), { once: true });
@@ -382,36 +506,85 @@ async function mostrarPuntajes() {
   const prog = Estado.progreso;
   const container = document.getElementById('tabla-puntajes');
 
+  // Intentar obtener métricas detalladas
+  let desempeno = null;
+  try {
+    desempeno = await api('GET', `/api/docente/estudiante/${Estado.estudiante.id}`);
+  } catch(_) {}
+
+  const ESTRELLAS = (pts) => {
+    const n = pts >= 90 ? 3 : pts >= 60 ? 2 : pts > 0 ? 1 : 0;
+    return [1,2,3].map(i =>
+      `<i class="fa-${i <= n ? 'solid' : 'regular'} fa-star" style="color:${i <= n ? '#FFD700' : 'rgba(255,255,255,0.2)'}; font-size:0.9rem;"></i>`
+    ).join('');
+  };
+
+  const filasMaterias = MATERIAS.map(mat => {
+    const p = prog[mat.clave] || { puntajes: [0,0,0,0,0], completados: 0 };
+    const puntajes = p.puntajes || [0,0,0,0,0];
+    const total = puntajes.reduce((a,b) => a+b, 0);
+    const dm = desempeno?.por_materia?.[mat.clave];
+
+    const celdas = puntajes.map(pts =>
+      `<td>${pts > 0
+        ? `<div class="pts-cell"><span class="pts-badge">${pts}</span><div style="font-size:0.7rem;">${ESTRELLAS(pts)}</div></div>`
+        : '<span class="pts-vacio">—</span>'
+      }</td>`
+    ).join('');
+
+    const metricasFila = dm ? `
+      <div class="pts-metricas">
+        <span class="pts-met-item pts-ok"><i class="fa-solid fa-check"></i> ${dm.total_aciertos || 0}</span>
+        <span class="pts-met-item pts-err"><i class="fa-solid fa-xmark"></i> ${dm.total_errores || 0}</span>
+      </div>` : '';
+
+    return `<tr>
+      <td>
+        <i class="${mat.icon}" style="margin-right:8px; color:var(--dorado);"></i>
+        <strong>${mat.nombre}</strong>
+        ${metricasFila}
+      </td>
+      ${celdas}
+      <td><strong>${total > 0 ? total : '—'}</strong></td>
+    </tr>`;
+  }).join('');
+
+  const totalGlobal = MATERIAS.reduce((acc, mat) => {
+    const p = prog[mat.clave] || { puntajes: [0,0,0,0,0] };
+    return acc + (p.puntajes || []).reduce((a,b) => a+b, 0);
+  }, 0);
+
   container.innerHTML = `
+    <div class="pts-resumen-header">
+      <div class="pts-resumen-nombre">
+        <i class="fa-solid fa-user-circle" style="color:var(--dorado); font-size:2rem;"></i>
+        <span>${Estado.estudiante.nombre}</span>
+      </div>
+      <div class="pts-resumen-total">
+        <i class="fa-solid fa-trophy" style="color:var(--dorado);"></i>
+        <span>${totalGlobal} pts totales</span>
+      </div>
+    </div>
     <table class="tabla-puntajes">
       <thead>
         <tr>
           <th>Materia</th>
-          ${[1,2,3,4,5].map(i => `<th>N${i}</th>`).join('')}
+          ${[1,2,3,4,5].map(i => `<th>Niv. ${i}</th>`).join('')}
           <th>Total</th>
         </tr>
       </thead>
-      <tbody>
-        ${MATERIAS.map(mat => {
-          const p = prog[mat.clave] || { puntajes: [0,0,0,0,0] };
-          const puntajes = p.puntajes || [0,0,0,0,0];
-          const total = puntajes.reduce((a,b) => a+b, 0);
-          const celdas = puntajes.map(pts =>
-            `<td>${pts > 0 ? `<span class="pts-badge">${pts}</span>` : '<span class="pts-vacio">—</span>'}</td>`
-          ).join('');
-          return `<tr>
-            <td><i class="${mat.icon}" style="margin-right:8px;"></i> ${mat.nombre}</td>
-            ${celdas}
-            <td><strong>${total}</strong></td>
-          </tr>`;
-        }).join('')}
-      </tbody>
-    </table>`;
+      <tbody>${filasMaterias}</tbody>
+    </table>
+    <p class="pts-leyenda"><i class="fa-solid fa-circle-info"></i> ✔ aciertos &nbsp;✖ errores por materia</p>`;
 
   mostrarPantalla('screen-puntajes');
 }
 
+
 document.getElementById('btn-volver-menu-scores').addEventListener('click', mostrarMenu);
+
+// Botón Cambiar usuario (siempre activo)
+document.getElementById('btn-cambiar-usuario').addEventListener('click', irALogin);
 
 // ── Inicializar ──────────────────────────────────────────────────────────────
 initIntro();

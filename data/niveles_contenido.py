@@ -44,21 +44,16 @@ TODOS_LOS_NIVELES = [
         "tema": "suma",
         "personaje": "El Riviel",
         "frase_intro": "¿Sabes sumar? Ayúdame a organizar la pesca en las canoas correctas.",
-        "minijuego": "drag_and_drop",
-        "instruccion": "Arrastra cada grupo de peces a la canoa con el número correcto",
+        "minijuego": "mate2_pesca",
+        "instruccion": "Arrastra cada grupo de peces a la canoa cuya suma da esa cantidad",
         "audio_intro": "assets/audio/riviel_m2.ogg",
-        "datos": {
-            "piezas": [
-                {"imagen": "assets/images/ui/grupo_3peces.png", "nombre": "3 peces", "zona_destino": "canoa_3"},
-                {"imagen": "assets/images/ui/grupo_5peces.png", "nombre": "5 peces", "zona_destino": "canoa_5"},
-                {"imagen": "assets/images/ui/grupo_2peces.png", "nombre": "2 peces", "zona_destino": "canoa_2"}
+        "configuracion": {
+            "rondas": [
+                {"grupos": [3, 5, 2], "canoas": ["2+1", "3+2", "1+1"]},
+                {"grupos": [4, 6, 5], "canoas": ["2+2", "3+3", "4+1"]},
+                {"grupos": [7, 8, 9], "canoas": ["3+4", "5+3", "6+3"]},
             ],
-            "zonas": [
-                {"id": "canoa_3", "etiqueta": "2 + 1", "posicion": (500, 150), "imagen": "assets/images/ui/canoa.png"},
-                {"id": "canoa_5", "etiqueta": "3 + 2", "posicion": (500, 300), "imagen": "assets/images/ui/canoa.png"},
-                {"id": "canoa_2", "etiqueta": "1 + 1", "posicion": (500, 450), "imagen": "assets/images/ui/canoa.png"}
-            ]
-        }
+        },
     },
     {
         "materia": "matematicas",
@@ -66,19 +61,18 @@ TODOS_LOS_NIVELES = [
         "nombre": "El Misterio de la Marea",
         "tema": "resta",
         "personaje": "El Riviel",
-        "frase_intro": "La marea se llevó algunos caracoles. Completa la resta para saber cuántos quedan.",
-        "minijuego": "puzzle",
-        "modo": "completar",
-        "instruccion": "Arrastra el número correcto para completar la resta",
+        "frase_intro": "La marea se llevó algunos caracoles. ¿Sabes cuántos quedaron en la arena?",
+        "minijuego": "mate3_marea",
+        "instruccion": "Mira cuántos caracoles se lleva la marea y toca el número que queda",
         "audio_intro": "assets/audio/riviel_m3.ogg",
-        "datos": {
-            "imagen_base": "assets/images/ui/resta_5_menos_2.png",
-            "piezas": [
-                {"imagen": "assets/images/ui/num_3.png", "texto": "3", "posicion": (400, 350)},
-                {"imagen": "assets/images/ui/num_4.png", "texto": "4", "posicion": (100, 100)},
-                {"imagen": "assets/images/ui/num_2.png", "texto": "2", "posicion": (100, 500)}
-            ]
-        }
+        "configuracion": {
+            "rondas": [
+                {"inicial": 5, "marea": 2},
+                {"inicial": 7, "marea": 3},
+                {"inicial": 9, "marea": 4},
+                {"inicial": 8, "marea": 5},
+            ],
+        },
     },
     {
         "materia": "matematicas",
@@ -86,19 +80,17 @@ TODOS_LOS_NIVELES = [
         "nombre": "El Tesoro Multiplicado",
         "tema": "multiplicacion",
         "personaje": "El Riviel",
-        "frase_intro": "Mira todas estas conchas brillantes. Encuentra los grupos que forman un 2x3.",
-        "minijuego": "point_and_click",
-        "instruccion": "Toca los grupos que contienen exactamente 6 conchas",
+        "frase_intro": "Mira todas estas conchas brillantes. Toca los cofres que tengan el total justo.",
+        "minijuego": "mate4_tesoro",
+        "instruccion": "Encuentra los grupos cuyo total coincida con la multiplicación pedida",
         "audio_intro": "assets/audio/riviel_m4.ogg",
-        "datos": {
-            "items": [
-                {"imagen": "assets/images/ui/grupo_6conchas.png", "es_correcto": True, "nombre": "6 conchas"},
-                {"imagen": "assets/images/ui/grupo_6conchas_b.png", "es_correcto": True, "nombre": "6 conchas"},
-                {"imagen": "assets/images/ui/grupo_4conchas.png", "es_correcto": False, "nombre": "4 conchas"},
-                {"imagen": "assets/images/ui/grupo_5conchas.png", "es_correcto": False, "nombre": "5 conchas"},
-                {"imagen": "assets/images/ui/grupo_8conchas.png", "es_correcto": False, "nombre": "8 conchas"}
-            ]
-        }
+        "configuracion": {
+            "rondas": [
+                {"a": 2, "b": 3, "distractores": [4, 5, 8]},
+                {"a": 2, "b": 4, "distractores": [6, 7, 9]},
+                {"a": 3, "b": 3, "distractores": [6, 8, 7]},
+            ],
+        },
     },
     {
         "materia": "matematicas",
@@ -107,21 +99,16 @@ TODOS_LOS_NIVELES = [
         "tema": "division",
         "personaje": "El Riviel",
         "frase_intro": "Hoy fue un gran día de pesca. Ayuda a repartir los peces en las canastas por igual.",
-        "minijuego": "drag_and_drop",
-        "instruccion": "Reparte 12 peces en 3 canastas (4 peces en cada una)",
+        "minijuego": "mate5_reparto",
+        "instruccion": "Arrastra los peces a las canastas hasta que cada una tenga lo justo",
         "audio_intro": "assets/audio/riviel_m5.ogg",
-        "datos": {
-            "piezas": [
-                {"imagen": "assets/images/ui/grupo_4peces.png", "nombre": "4 peces", "zona_destino": "canasta_1"},
-                {"imagen": "assets/images/ui/grupo_4peces.png", "nombre": "4 peces", "zona_destino": "canasta_2"},
-                {"imagen": "assets/images/ui/grupo_4peces.png", "nombre": "4 peces", "zona_destino": "canasta_3"}
+        "configuracion": {
+            "rondas": [
+                {"total": 6,  "canastas": 3, "porCanasta": 2},
+                {"total": 12, "canastas": 3, "porCanasta": 4},
+                {"total": 10, "canastas": 2, "porCanasta": 5},
             ],
-            "zonas": [
-                {"id": "canasta_1", "etiqueta": "Canasta A", "posicion": (500, 150), "imagen": "assets/images/ui/canasta.png"},
-                {"id": "canasta_2", "etiqueta": "Canasta B", "posicion": (500, 300), "imagen": "assets/images/ui/canasta.png"},
-                {"id": "canasta_3", "etiqueta": "Canasta C", "posicion": (500, 450), "imagen": "assets/images/ui/canasta.png"}
-            ]
-        }
+        },
     },
 
     # ---------------------------------------------------------

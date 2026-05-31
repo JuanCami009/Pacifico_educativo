@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-  <link rel="stylesheet" href="/static/css/styles.css?v=1.1">
+  <link rel="stylesheet" href="/static/css/styles.css?v=1.4">
 </head>
 <body>
 
@@ -24,9 +24,27 @@
       <button id="btn-entrar" class="btn btn-primary btn-grande">¡Entrar a la aventura! 🚀</button>
       <p id="intro-error" class="error-msg hidden"></p>
     </div>
+    <!-- Lista de usuarios guardados -->
+    <div id="usuarios-guardados" class="usuarios-guardados-panel hidden">
+      <p class="usuarios-guardados-titulo"><i class="fa-solid fa-users"></i> Aventureros guardados</p>
+      <div id="usuarios-lista" class="usuarios-lista"></div>
+    </div>
     <button id="btn-soy-docente" class="btn btn-ghost btn-sm docente-acceso-btn">
       <i class="fa-solid fa-chalkboard-user"></i> Soy docente
     </button>
+  </div>
+</div>
+
+<!-- MODAL: Continuar o reiniciar progreso -->
+<div id="modal-progreso" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="modal-icono">🎒</div>
+    <h2 id="modal-progreso-nombre" class="modal-titulo">¡Hola, aventurero!</h2>
+    <p id="modal-progreso-desc" class="modal-desc">Ya tienes progreso guardado.</p>
+    <div class="modal-botones">
+      <button id="modal-btn-continuar" class="btn btn-primary"><i class="fa-solid fa-play"></i> Continuar aventura</button>
+      <button id="modal-btn-reiniciar" class="btn btn-outline" style="color:#ef5350; border-color:#ef5350;"><i class="fa-solid fa-rotate-left"></i> Empezar de cero</button>
+    </div>
   </div>
 </div>
 
@@ -96,8 +114,17 @@
 <!-- PANTALLA 2: MENÚ DE MATERIAS -->
 <div id="screen-menu" class="screen">
   <header class="app-header">
-    <div id="saludo-header" class="saludo">¡Hola!</div>
-    <button id="btn-puntajes" class="btn btn-outline btn-sm">📊 Mis Puntajes</button>
+    <button id="btn-cambiar-usuario"
+      class="btn btn-ghost btn-sm"
+      style="position:relative;z-index:200;"
+      onclick="localStorage.removeItem('pacifico_estado_v2'); window.location.reload();"
+    >← Cambiar usuario</button>
+    <div id="saludo-header" class="saludo" style="pointer-events:none;">Hola!</div>
+    <button id="btn-puntajes"
+      class="btn btn-outline btn-sm"
+      style="position:relative;z-index:200;"
+      onclick="mostrarPuntajes()"
+    >📊 Mis Puntajes</button>
   </header>
   <p class="subtitulo-menu">¿Qué quieres aprender hoy?</p>
   <div class="materias-grid" id="materias-grid"></div>
@@ -137,9 +164,9 @@
     <button id="btn-pedir-pista" class="btn btn-outline btn-sm btn-pista">
       <i class="fa-solid fa-lightbulb"></i> Pista
     </button>
-    <div class="puntaje-badge">
-      <span><i class="fa-solid fa-star" style="color: #FFD700; margin-right: 4px;"></i></span><span id="puntaje-display">100</span>
-    </div>
+  </div>
+  <div class="puntaje-badge">
+    <span><i class="fa-solid fa-star" style="color: #FFD700; margin-right: 4px;"></i></span><span id="puntaje-display">100</span>
   </div>
   <div id="ia-pista-box" class="ia-pista-box hidden"></div>
   <div id="game-area"></div>
@@ -206,12 +233,14 @@
   </div>
 </div>
 
-<script src="/static/js/point_and_click.js?v=1.2"></script>
-<script src="/static/js/drag_and_drop.js?v=1.2"></script>
-<script src="/static/js/puzzle.js?v=1.2"></script>
-<script src="/static/js/atrapa_ranas.js?v=1.2"></script>
+<script src="/static/js/pacific_icons.js?v=1.0"></script>
+<script src="/static/js/point_and_click.js?v=1.3"></script>
+<script src="/static/js/drag_and_drop.js?v=1.3"></script>
+<script src="/static/js/puzzle.js?v=1.3"></script>
+<script src="/static/js/atrapa_ranas.js?v=1.3"></script>
+<script src="/static/js/mate_niveles.js?v=1.0"></script>
 <script src="/static/js/ia_chat.js?v=1.0"></script>
-<script src="/static/js/app.js?v=1.2"></script>
+<script src="/static/js/app.js?v=1.6"></script>
 <script src="/static/js/docente.js?v=1.0"></script>
 </body>
 </html>

@@ -88,13 +88,6 @@
     root.innerHTML = `
       <div class="atrapa-hud-superior">
         <div class="atrapa-vidas" id="atrapa-vidas" aria-label="Vidas"></div>
-        <div class="atrapa-medallon" id="atrapa-puntaje-ui" role="status">0</div>
-      </div>
-      <div class="atrapa-pergamino" id="atrapa-pergamino">
-        <div class="atrapa-riviel-fila">
-          <img id="atrapa-riviel-img" class="atrapa-riviel-img" src="" alt="El Riviel" width="72" height="72" />
-          <p class="atrapa-pergamino-texto" id="atrapa-mensaje-riviel"></p>
-        </div>
       </div>
       <div class="atrapa-zona-vuelo" id="atrapa-zona-vuelo">
         <div class="atrapa-sombra-rio" aria-hidden="true"></div>
@@ -116,16 +109,11 @@
     contenedor.appendChild(root);
 
     const elVidas = root.querySelector('#atrapa-vidas');
-    const elPuntaje = root.querySelector('#atrapa-puntaje-ui');
-    const elMensaje = root.querySelector('#atrapa-mensaje-riviel');
-    const elRivielImg = root.querySelector('#atrapa-riviel-img');
+    const elMensajeGlobal = document.getElementById('instruccion-texto');
     const zonaVuelo = root.querySelector('#atrapa-zona-vuelo');
     const gaviotaHost = root.querySelector('#atrapa-gaviota-host');
     const gaviotaInner = root.querySelector('#atrapa-gaviota-inner');
     const overlayGO = root.querySelector('#atrapa-gameover');
-
-    elRivielImg.src = URLS.riviel;
-    elRivielImg.onerror = () => { elRivielImg.style.visibility = 'hidden'; };
 
     const gaviotaImg = document.createElement('img');
     gaviotaImg.className = 'atrapa-gaviota-img';
@@ -165,13 +153,13 @@
     }
 
     function animarMedallon() {
-      elPuntaje.classList.remove('atrapa-medallon-pop');
-      void elPuntaje.offsetWidth;
-      elPuntaje.classList.add('atrapa-medallon-pop');
+      // Ya no animamos el medallón local porque usamos el global
     }
 
     function actualizarMensajePrincipal() {
-      elMensaje.textContent = `¡Atrapa solo los cangrejos con el número ${numeroPedido}!`;
+      if (elMensajeGlobal) {
+        elMensajeGlobal.innerHTML = `<img src="${URLS.riviel}" style="width:32px; height:32px; object-fit:contain; vertical-align:middle; margin-right:8px; border-radius:50%; border:2px solid var(--dorado); background:rgba(255,255,255,0.4);" alt=""/> ¡Atrapa solo los cangrejos con el número ${numeroPedido}!`;
+      }
     }
 
     function rangoNumeroPorRonda(nr) {
@@ -328,7 +316,9 @@
 
     function mostrarAlientoYContinuar() {
       const f = FRASES_ALIENTO[Math.floor(Math.random() * FRASES_ALIENTO.length)];
-      elMensaje.textContent = f;
+      if (elMensajeGlobal) {
+        elMensajeGlobal.innerHTML = `<img src="${URLS.riviel}" style="width:32px; height:32px; object-fit:contain; vertical-align:middle; margin-right:8px; border-radius:50%; border:2px solid var(--dorado); background:rgba(255,255,255,0.4);" alt=""/> ${f}`;
+      }
       if (timeoutAlientoId) clearTimeout(timeoutAlientoId);
       timeoutAlientoId = setTimeout(() => {
         timeoutAlientoId = 0;
@@ -483,9 +473,7 @@
         }, 220);
         puntaje += 10;
         _aciertos++;
-        elPuntaje.textContent = String(puntaje);
         syncHudGlobal();
-        animarMedallon();
         atrapadosRonda++;
         spawnExtra();
         if (atrapadosRonda >= META_RONDA) {
@@ -542,7 +530,6 @@
     requestAnimationFrame(() => {
       iniciarRonda();
       syncHudGlobal();
-      elPuntaje.textContent = '0';
       rafId = requestAnimationFrame(tick);
     });
 
@@ -556,7 +543,6 @@
       vidas = MAX_VIDAS;
       puntaje = 0;
       ronda = 1;
-      elPuntaje.textContent = '0';
       syncHudGlobal();
       renderVidas();
       ultimoTickMs = 0;
@@ -572,6 +558,7 @@
       zonaVuelo.removeEventListener('pointerdown', onPointerDown);
       contenedor.classList.remove('atrapa-ranas-area');
       contenedor.innerHTML = '';
+      if (elMensajeGlobal) elMensajeGlobal.innerHTML = '';
     }
 
     return destruir;

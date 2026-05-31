@@ -83,10 +83,10 @@ class MotorDragDrop {
     el.dataset.id = pieza.nombre;
     el.dataset.destino = pieza.zona_destino;
 
-    // Crear icono con FontAwesome en vez de emojis
+    // Ícono SVG local del Pacífico
     const icon = document.createElement('div');
     icon.className = 'pieza-drag-icon';
-    icon.innerHTML = `<i class="${this._iconPorNombre(pieza.nombre)}"></i>`;
+    icon.innerHTML = PacificIcons.get(pieza.nombre);
     el.appendChild(icon);
 
     const text = document.createElement('span');
@@ -189,41 +189,4 @@ class MotorDragDrop {
     }));
   }
 
-  /** Devuelve una clase de FontAwesome representativa según el nombre del elemento */
-  _iconPorNombre(nombre) {
-    const mapa = {
-      // Peces
-      '3 peces': 'fa-solid fa-fish',
-      '5 peces': 'fa-solid fa-fish',
-      '2 peces': 'fa-solid fa-fish',
-      '4 peces': 'fa-solid fa-fish',
-      pez: 'fa-solid fa-fish',
-      mono: 'fa-solid fa-paw',
-      ballena: 'fa-solid fa-water',
-      
-      // Biología
-      rana: 'fa-solid fa-frog',
-      hoja: 'fa-solid fa-leaf',
-      palma: 'fa-solid fa-tree',
-      
-      // Letras / Sílabas
-      rim: 'fa-solid fa-font',
-      ta: 'fa-solid fa-font',
-      glar: 'fa-solid fa-font',
-    };
-
-    const normalized = nombre.toLowerCase().trim();
-    if (mapa[normalized]) return mapa[normalized];
-
-    // Fallbacks
-    if (normalized.includes('peces') || normalized.includes('pez') || normalized.includes('fish')) return 'fa-solid fa-fish';
-    if (normalized.includes('rana') || normalized.includes('frog')) return 'fa-solid fa-frog';
-    if (normalized.includes('hoja') || normalized.includes('planta') || normalized.includes('rama') || normalized.includes('leaf')) return 'fa-solid fa-leaf';
-    if (normalized.includes('palma') || normalized.includes('árbol') || normalized.includes('arbol') || normalized.includes('tree')) return 'fa-solid fa-tree';
-    
-    // Si es una sílaba corta (2-4 letras)
-    if (normalized.length <= 4) return 'fa-solid fa-font';
-
-    return 'fa-solid fa-circle-question';
-  }
 }
