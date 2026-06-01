@@ -174,8 +174,8 @@ function initIntro() {
           if (st.pantallaActual === 'screen-minijuego') {
             await mostrarPersonaje(st.nivelActivo);
             iniciarMinijuego();
-          } else if (st.pantallaActual === 'screen-personaje') {
-            mostrarPersonaje(st.nivelActivo);
+          } else if (st.pantallaActual === 'screen-personaje' || st.pantallaActual === 'screen-mision') {
+            mostrarMision(st.nivelActivo);
           } else if (st.pantallaActual === 'screen-level-select') {
             seleccionarMateria(st.materiaActiva);
           } else if (st.pantallaActual === 'screen-puntajes') {
@@ -251,9 +251,30 @@ function mostrarMenu() {
   });
 
   mostrarPantalla('screen-menu');
+
+  // ── Precarga AGRESIVA: nivel 1 de cada materia desde el menú ──────────────
+  // Así, cuando el estudiante elige una materia y luego un nivel, la historia
+  // del nivel 1 ya está lista. Los demás niveles se precargan al entrar al selector.
+  _precargarNivel1DeCadaMateria();
 }
 
-document.getElementById('btn-puntajes').addEventListener('click', mostrarPuntajes);
+// Precarga solo el nivel 1 de cada materia (4 historias en background, secuencial)
+async function _precargarNivel1DeCadaMateria() {
+  const materias = MATERIAS.map(m => m.clave);
+  for (const mat of materias) {
+    const k = `${mat}-1`;
+    if (_historiaCache.has(k)) continue;
+    _historiaCache.set(k, 'loading');
+    await _precargarHistoria(mat, 1, k);
+  }
+}
+
+// Función global accesible desde el onclick inline (más confiable que addEventListener)
+window.__verPuntajes = function() {
+  console.log('[Puntajes] Click detectado');
+  mostrarPuntajes();
+};
+document.getElementById('btn-puntajes').addEventListener('click', window.__verPuntajes);
 
 // ── PANTALLA 3: Selección de nivel ──────────────────────────────────────────
 function seleccionarMateria(clave) {
@@ -264,34 +285,62 @@ function seleccionarMateria(clave) {
   const prog = Estado.progreso[clave] || { nivel_maximo: 1 };
   const nivelMax = prog.nivel_maximo || 1;
 
-  // Encabezado
+  // Encabezado: si la materia tiene imagen del personaje, mostrarla; si no, icono de FontAwesome
   document.getElementById('level-select-titulo').textContent = mat.nombre;
+  const imgPersonaje = _imagenPersonaje(clave);
+  const visualPersonaje = imgPersonaje
+    ? `<img src="${imgPersonaje}" alt="${per.nombre}" class="personaje-banner-img">`
+    : `<span style="font-size:2rem"><i class="${per.icon}" style="color:${per.color}"></i></span>`;
   document.getElementById('personaje-guia-banner').innerHTML =
-    `<span style="font-size:2rem"><i class="${per.icon}" style="color:${per.color}"></i></span>
-     <div style="margin-left:12px;"><strong>${per.nombre}</strong> te acompaña en esta aventura</div>`;
+    `${visualPersonaje}
+     <div style="margin-left:14px;"><strong>${per.nombre}</strong> te acompaña en esta aventura</div>`;
 
-  // Círculos de nivel
+  // Nodos de nivel con imágenes por materia
   const camino = document.getElementById('niveles-camino');
   camino.innerHTML = '';
   for (let i = 1; i <= 5; i++) {
     const puntaje    = (prog.puntajes || [])[i - 1] || 0;
     const completado = puntaje > 0;
-    const disponible = i === nivelMax && !completado;
     const desbloq    = i <= nivelMax;
+    const esCurrent  = i === nivelMax && !completado;
 
     const paso = document.createElement('div');
     paso.className = 'nivel-paso';
 
-    const circulo = document.createElement('div');
-    const clase = completado ? 'completado' : (disponible ? 'disponible' : (desbloq ? 'disponible' : 'bloqueado'));
-    circulo.className = `nivel-circulo ${clase}`;
-    circulo.innerHTML = completado
-      ? `<i class="fa-solid fa-star" style="color:#FFD700;"></i><br><small style="font-size:0.6rem; font-weight:800;">${puntaje}pts</small>`
-      : (desbloq ? `${i}` : '<i class="fa-solid fa-lock" style="opacity:0.5;"></i>');
+    // ── Nodo imagen ──────────────────────────────────────────────────
+    const nodo = document.createElement('div');
+    const claseEstado = completado ? 'completado' : (esCurrent ? 'disponible' : (desbloq ? 'disponible' : 'bloqueado'));
+    nodo.className = `nivel-nodo ${claseEstado}`;
+
+    // Imagen del nivel (si existe para esta materia)
+    const imgSrc = _imagenNivel(clave, i);
+    if (imgSrc) {
+      const img = document.createElement('img');
+      img.src = imgSrc;
+      img.alt = `Nivel ${i}`;
+      img.className = 'nivel-nodo-img';
+      nodo.appendChild(img);
+    } else {
+      // Fallback: número
+      nodo.innerHTML = `<span class="nivel-nodo-num">${i}</span>`;
+    }
+
+    // Overlay: bloqueado / completado
+    if (!desbloq) {
+      const lock = document.createElement('div');
+      lock.className = 'nivel-nodo-overlay locked';
+      lock.innerHTML = '<i class="fa-solid fa-lock"></i>';
+      nodo.appendChild(lock);
+    } else if (completado) {
+      const check = document.createElement('div');
+      check.className = 'nivel-nodo-overlay completed';
+      check.innerHTML = `<i class="fa-solid fa-star"></i><span>${puntaje}</span>`;
+      nodo.appendChild(check);
+    }
 
     if (desbloq) {
-      circulo.style.cursor = 'pointer';
-      circulo.addEventListener('click', () => mostrarPersonaje(i));
+      nodo.style.cursor = 'pointer';
+      nodo.addEventListener('click', () => mostrarMision(i));
     }
 
     const nombre = document.createElement('div');
@@ -302,7 +351,7 @@ function seleccionarMateria(clave) {
     wrapper.style.display = 'flex';
     wrapper.style.flexDirection = 'column';
     wrapper.style.alignItems = 'center';
-    wrapper.appendChild(circulo);
+    wrapper.appendChild(nodo);
     wrapper.appendChild(nombre);
     paso.appendChild(wrapper);
 
@@ -316,29 +365,264 @@ function seleccionarMateria(clave) {
   }
 
   mostrarPantalla('screen-level-select');
+
+  // ── Precarga de historias + audio en background ───────────────────────────
+  _precargarHistorias(clave);
 }
 
-document.getElementById('btn-volver-menu').addEventListener('click', () => {
-  cargarProgreso().then(mostrarMenu);
-});
+/**
+ * Devuelve la ruta de imagen del nodo de nivel para una materia dada.
+ * Si no hay imagen específica devuelve null (usa fallback numérico).
+ */
+function _imagenNivel(materia, nivel) {
+  const mapas = {
+    matematicas: {
+      1: '/static/images/level_matematicas/level1Mat.png',
+      2: '/static/images/level_matematicas/level2Mat.png',
+      3: '/static/images/level_matematicas/level3Mat.png',
+      4: '/static/images/level_matematicas/level4Mat.png',
+      5: '/static/images/level_matematicas/level5Mat.png',
+    },
+  };
+  return (mapas[materia] || {})[nivel] || null;
+}
 
-// ── PANTALLA 4: Intro del personaje ─────────────────────────────────────────
-async function mostrarPersonaje(nivel) {
+/**
+ * Devuelve la imagen de fondo de la pantalla "¡Nueva Misión!" para una materia y nivel.
+ */
+function _imagenMision(materia, nivel) {
+  const mapa = {
+    matematicas: '/static/images/level_matematicas/explicaNiv2-5Mat.png',
+    lenguaje:    '/static/images/level_lenguaje/explicaNivLen.png',
+    ingles:      '/static/images/level_ingles/explicaNivIng.png',
+    biologia:    '/static/images/level_biologia/explicaNivBio.png',
+  };
+  return mapa[materia] || null;
+}
+
+// Función global accesible desde el onclick inline del botón (más confiable que addEventListener)
+window.__volverAlMenu = function() {
+  console.log('[Menú] Click detectado, navegando…');
+  // Navegar inmediatamente — no esperar nada.
+  mostrarMenu();
+  // Actualizar progreso en background, sin bloquear nada.
+  cargarProgreso().then(mostrarMenu).catch(() => {});
+};
+// Mantener el listener anterior como respaldo
+document.getElementById('btn-volver-menu').addEventListener('click', window.__volverAlMenu);
+
+// ── PANTALLA 4: Nueva Misión ─────────────────────────────────────────────────
+async function mostrarMision(nivel) {
   Estado.nivelActivo = nivel;
-  const datos = await api('GET', `/api/niveles/${Estado.materiaActiva}/${nivel}`);
-  Estado.nivelDatos = datos;
 
-  const per = PERSONAJES[Estado.materiaActiva];
-  document.getElementById('pers-emoji').innerHTML = `<i class="${per.icon}" style="color:${per.color}; font-size:4.5rem; text-shadow:0 0 20px rgba(255,255,255,0.2)"></i>`;
-  document.getElementById('pers-nombre').textContent = datos.personaje || per.nombre;
-  document.getElementById('pers-nivel').textContent  = `Nivel ${nivel}: ${NOMBRES_NIVEL[nivel-1]}`;
-  document.getElementById('pers-frase').textContent  = datos.frase_intro || '¡Adelante, aventurero!';
+  const per    = PERSONAJES[Estado.materiaActiva];
+  const screen = document.getElementById('screen-mision');
+  const textoEl = document.getElementById('mision-historia-texto');
 
-  mostrarPantalla('screen-personaje');
+  // ── Fondo de la pantalla ──────────────────────────────────────────
+  const bgEl  = document.getElementById('mision-bg');
+  const bgImg = _imagenMision(Estado.materiaActiva, nivel);
+  if (bgImg) {
+    bgEl.style.backgroundImage = `url('${bgImg}')`;
+    bgEl.style.backgroundSize  = 'cover';
+    bgEl.style.backgroundPosition = 'center center';
+    screen.classList.add('mision-con-imagen');
+  } else {
+    bgEl.style.backgroundImage = '';
+    screen.classList.remove('mision-con-imagen');
+  }
+
+  // Spinner mientras esperamos
+  textoEl.innerHTML = `<span class="mision-loading"><i class="fa-solid fa-spinner fa-spin"></i> ${per.nombre} prepara tu misión...</span>`;
+  _ttsOcultarBtn();
+  mostrarPantalla('screen-mision');
+
+  // ── Intentar usar cache precargado, o esperar la precarga en curso ────────
+  const cacheKey = `${Estado.materiaActiva}-${nivel}`;
+  let cached = _historiaCache.get(cacheKey);
+
+  if (cached === 'loading') {
+    // Ya está en camino — esperar hasta 35 segundos (Ollama puede tardar ~20-30s)
+    for (let i = 0; i < 175 && cached === 'loading'; i++) {
+      await new Promise(r => setTimeout(r, 200));
+      cached = _historiaCache.get(cacheKey);
+    }
+  }
+
+  if (cached && cached !== 'loading' && cached.historia) {
+    // ✅ Cache hit: usar datos precargados
+    Estado.nivelDatos = cached.datos || Estado.nivelDatos;
+    textoEl.innerHTML = '';
+    await _escribirTexto(textoEl, cached.historia);
+    _ttsGuardarAudio(cached.audioUrl);
+    _ttsMostrarBtn();
+    return;
+  }
+
+  // ── Fallback: fetch directo si el cache no está listo ────────────────────
+  try {
+    const datos = await api('GET', `/api/niveles/${Estado.materiaActiva}/${nivel}`);
+    Estado.nivelDatos = datos;
+    const res = await api('POST', '/api/ia/historia_nivel', {
+      materia:      Estado.materiaActiva,
+      nivel,
+      personaje:    datos.personaje || per.nombre,
+      instruccion:  datos.instruccion || '',
+      nombre_nivel: NOMBRES_NIVEL[nivel - 1] || '',
+      minijuego:    datos.minijuego || '',
+    });
+    const historia = res.historia || res.respuesta || datos.frase_intro || '¡Adelante, aventurero!';
+    // Guardar en caché para futuras visitas
+    _historiaCache.set(cacheKey, { historia, audioUrl: res.audioUrl || null, datos });
+    textoEl.innerHTML = '';
+    await _escribirTexto(textoEl, historia);
+    _ttsGuardarAudio(res.audioUrl || null);
+    _ttsMostrarBtn();
+  } catch (_) {
+    const datos = Estado.nivelDatos || {};
+    const fallback = datos.frase_intro || '¡Adelante, aventurero del Pacífico!';
+    textoEl.textContent = fallback;
+    _ttsOcultarBtn();
+  }
 }
 
-document.getElementById('btn-jugar').addEventListener('click', iniciarMinijuego);
-document.getElementById('btn-volver-level').addEventListener('click', () => seleccionarMateria(Estado.materiaActiva));
+/** Efecto de escritura carácter a carácter. Cancela cualquier animación previa. */
+let _escribirIntervalId = null;
+function _escribirTexto(el, texto, velMs = 18) {
+  // Cancelar animación anterior si existe
+  if (_escribirIntervalId !== null) {
+    clearInterval(_escribirIntervalId);
+    _escribirIntervalId = null;
+  }
+  return new Promise(resolve => {
+    let i = 0;
+    el.textContent = '';
+    _escribirIntervalId = setInterval(() => {
+      if (i < texto.length) {
+        el.textContent += texto[i++];
+      } else {
+        clearInterval(_escribirIntervalId);
+        _escribirIntervalId = null;
+        resolve();
+      }
+    }, velMs);
+  });
+}
+
+/** Ruta de imagen del personaje si existe como PNG */
+function _imagenPersonaje(materia) {
+  const map = {
+    matematicas: '/static/images/level_matematicas/riviel.png',
+  };
+  return map[materia] || null;
+}
+
+// Compatibilidad: alias para el flujo de restauración de estado
+async function mostrarPersonaje(nivel) { return mostrarMision(nivel); }
+
+// ── Precarga de historias + audio (background, al abrir selector de niveles) ──
+const _historiaCache = new Map(); // clave: `${materia}-${nivel}` → {historia, audioUrl, datos} | 'loading'
+
+async function _precargarHistorias(materia) {
+  // Secuencial: una a la vez para no saturar Ollama ni las conexiones del navegador
+  for (let nivel = 1; nivel <= 5; nivel++) {
+    const k = `${materia}-${nivel}`;
+    if (_historiaCache.has(k)) continue; // ya en caché o cargando
+    _historiaCache.set(k, 'loading');
+    await _precargarHistoria(materia, nivel, k);   // esperar que termine antes de la siguiente
+  }
+}
+
+async function _precargarHistoria(materia, nivel, cacheKey) {
+  try {
+    const datos = await api('GET', `/api/niveles/${materia}/${nivel}`);
+    const per   = PERSONAJES[materia] || {};
+    const res   = await api('POST', '/api/ia/historia_nivel', {
+      materia, nivel,
+      personaje:    datos.personaje || per.nombre || '',
+      instruccion:  datos.instruccion || '',
+      nombre_nivel: NOMBRES_NIVEL[nivel - 1] || '',
+      minijuego:    datos.minijuego || '',
+    });
+    _historiaCache.set(cacheKey, {
+      historia: res.historia || res.respuesta || datos.frase_intro || '',
+      audioUrl: res.audioUrl || null,
+      datos,
+    });
+    console.log(`[Precarga] Listo: ${cacheKey}`);
+  } catch (e) {
+    _historiaCache.delete(cacheKey); // permitir reintento
+    console.warn(`[Precarga] Error: ${cacheKey}`, e);
+  }
+}
+
+// ── TTS offline usando elemento <audio> (el audio lo genera el servidor) ─────
+let _ttsAudioUrl = null;
+
+function _ttsGuardarAudio(audioUrl) { _ttsAudioUrl = audioUrl || null; }
+// mantener alias por compat con código anterior
+function _ttsGuardarTexto() {}
+
+function _ttsMostrarBtn() {
+  const btn = document.getElementById('btn-tts-mision');
+  if (!btn) return;
+  // Mostrar solo si hay URL de audio disponible
+  if (_ttsAudioUrl) {
+    btn.classList.remove('hidden');
+    btn.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
+    btn.classList.remove('tts-hablando');
+  } else {
+    btn.classList.add('hidden');
+  }
+}
+
+function _ttsOcultarBtn() {
+  const btn = document.getElementById('btn-tts-mision');
+  if (btn) btn.classList.add('hidden');
+  _ttsDetener();
+}
+
+function _ttsDetener() {
+  const audio = document.getElementById('mision-audio');
+  if (audio && !audio.paused) {
+    audio.pause();
+    audio.currentTime = 0;
+  }
+  const btn = document.getElementById('btn-tts-mision');
+  if (btn) {
+    btn.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
+    btn.classList.remove('tts-hablando');
+  }
+}
+
+function toggleTTS() {
+  const audio = document.getElementById('mision-audio');
+  if (!audio) return;
+
+  if (!audio.paused) {
+    // Detener
+    _ttsDetener();
+    return;
+  }
+
+  if (!_ttsAudioUrl) return;
+
+  audio.src = _ttsAudioUrl;
+  audio.load();
+  audio.play()
+    .then(() => {
+      const btn = document.getElementById('btn-tts-mision');
+      if (btn) { btn.innerHTML = '<i class="fa-solid fa-stop"></i>'; btn.classList.add('tts-hablando'); }
+    })
+    .catch(e => console.warn('[TTS] play error:', e));
+
+  // Al terminar, restaurar icono
+  audio.onended = _ttsDetener;
+  audio.onerror = _ttsDetener;
+}
+
+document.getElementById('btn-jugar').addEventListener('click', () => { _ttsDetener(); iniciarMinijuego(); });
+document.getElementById('btn-volver-level').addEventListener('click', () => { _ttsDetener(); seleccionarMateria(Estado.materiaActiva); });
 
 // ── PANTALLA 5: Minijuego ────────────────────────────────────────────────────
 async function iniciarMinijuego() {
@@ -583,8 +867,14 @@ async function mostrarPuntajes() {
 
 document.getElementById('btn-volver-menu-scores').addEventListener('click', mostrarMenu);
 
-// Botón Cambiar usuario (siempre activo)
-document.getElementById('btn-cambiar-usuario').addEventListener('click', irALogin);
+// Botón Cambiar usuario (siempre activo) — función global accesible desde onclick inline
+window.__cambiarUsuario = function() {
+  console.log('[CambiarUsuario] Click detectado');
+  try { localStorage.removeItem('pacifico_estado_v2'); } catch(e) {}
+  // irALogin reinicia el flujo limpio
+  irALogin();
+};
+document.getElementById('btn-cambiar-usuario').addEventListener('click', window.__cambiarUsuario);
 
 // ── Inicializar ──────────────────────────────────────────────────────────────
 initIntro();

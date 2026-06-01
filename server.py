@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from flask import Flask, jsonify, request, render_template
 from utils.ollama_service import servicio_ia
+from utils.tts_service import generar_audio as tts_generar
 from data.ia_fallback import MATERIA_A_PERSONAJE
 from utils.database import (
     inicializar_base_de_datos,
@@ -296,6 +297,48 @@ def ia_pista():
     return jsonify(resultado)
 
 
+@app.route("/api/ia/historia_nivel", methods=["POST"])
+def ia_historia_nivel():
+    """
+    Genera una historia corta y nueva cada vez que se va a jugar un nivel.
+    El personaje narra una mini-historia que contextualiza la mecánica del nivel.
+    Nunca usa caché — siempre es una historia fresca de Ollama.
+    """
+    datos = request.get_json(silent=True) or {}
+    materia   = (datos.get("materia")   or "").strip()
+    nivel     = _leer_entero(datos.get("nivel", 0))
+    personaje = (datos.get("personaje") or "").strip()
+    instruccion = (datos.get("instruccion") or "").strip()
+    nombre_nivel = (datos.get("nombre_nivel") or "").strip()
+    minijuego    = (datos.get("minijuego")    or "").strip()
+
+    if not personaje and materia:
+        from utils.ollama_service import MATERIA_A_PERSONAJE
+        personaje = MATERIA_A_PERSONAJE.get(materia, "")
+
+    contexto_nivel = _obtener_contexto_ia_nivel(materia, nivel) if materia and nivel else None
+
+    resultado = servicio_ia.generar_historia_nivel(
+        personaje    = personaje,
+        materia      = materia,
+        nivel        = nivel,
+        nombre_nivel = nombre_nivel,
+        instruccion  = instruccion,
+        minijuego    = minijuego,
+        contexto_nivel_info = contexto_nivel,
+    )
+
+    # Generar audio TTS offline y adjuntar la URL al resultado
+    historia_texto = resultado.get("historia") or resultado.get("respuesta") or ""
+    if historia_texto:
+        audio_url = tts_generar(historia_texto)
+        resultado["audioUrl"] = audio_url  # None si falla; el cliente lo ignora
+    else:
+        resultado["audioUrl"] = None
+
+    return jsonify(resultado)
+
+
 @app.route("/api/ia/retroalimentacion", methods=["POST"])
 def ia_retroalimentacion():
     """Genera retroalimentación IA después de completar un nivel."""
@@ -402,5 +445,121 @@ def docente_reporte_clase():
     })
 
 
+# ── Reportes RAPIDOS sin IA (basados solo en estadisticas de la DB) ───────────
+
+NOMBRES_MATERIA = {
+    "matematicas": "Matemáticas",
+    "lenguaje":    "Lenguaje",
+    "ingles":      "Inglés",
+    "biologia":    "Biología",
+}
+
+
+def _reporte_rapido_estudiante(desempeno: dict) -> str:
+    """Resumen legible instantaneo a partir de las metricas del estudiante."""
+    nombre = desempeno.get("nombre", "Estudiante")
+    por_materia = desempeno.get("por_materia") or {}
+    por_tema = desempeno.get("por_tema") or {}
+
+    lineas = [f"Resumen rápido de {nombre}", "=" * 36, ""]
+
+    if not por_materia:
+        lineas.append("Aún no ha completado ningún nivel.")
+        return "\n".join(lineas)
+
+    lineas.append("Desempeño por materia:")
+    for mat, datos in sorted(por_materia.items()):
+        nom_mat = NOMBRES_MATERIA.get(mat, mat.capitalize())
+        prom = datos.get("promedio_puntaje", 0)
+        niv  = datos.get("niveles_completados", 0)
+        tasa = datos.get("tasa_error", 0)
+        emoji = "🟢" if prom >= 80 else "🟡" if prom >= 60 else "🔴"
+        lineas.append(
+            f"  {emoji} {nom_mat}: {prom:.0f}/100  ·  {niv} nivel(es)  ·  "
+            f"tasa de error {int(tasa * 100)}%"
+        )
+
+    if por_tema:
+        bajos = [(t, d) for t, d in por_tema.items() if d.get("promedio_puntaje", 100) < 70]
+        if bajos:
+            lineas.append("")
+            lineas.append("Temas que necesitan refuerzo:")
+            for tema, d in sorted(bajos, key=lambda x: x[1].get("promedio_puntaje", 0))[:5]:
+                lineas.append(f"  • {tema}: {d.get('promedio_puntaje', 0):.0f}/100")
+
+    promedios = [d.get("promedio_puntaje", 0) for d in por_materia.values()]
+    prom_general = sum(promedios) / len(promedios) if promedios else 0
+    lineas.append("")
+    if prom_general >= 80:
+        lineas.append("✨ Excelente desempeño general. Sigue motivando con retos nuevos.")
+    elif prom_general >= 60:
+        lineas.append("👍 Buen progreso. Refuerza los temas con menor puntaje.")
+    else:
+        lineas.append("⚠️ Necesita acompañamiento. Considera repasar los conceptos básicos.")
+
+    return "\n".join(lineas)
+
+
+def _reporte_rapido_clase(desempeno: dict) -> str:
+    """Resumen legible instantaneo de la clase entera."""
+    por_materia = desempeno.get("por_materia") or {}
+    por_tema = desempeno.get("por_tema") or {}
+
+    lineas = ["Resumen rápido de la clase", "=" * 36, ""]
+
+    if not por_materia:
+        lineas.append("La clase aún no tiene niveles registrados.")
+        return "\n".join(lineas)
+
+    lineas.append("Desempeño por materia:")
+    for mat, datos in sorted(por_materia.items()):
+        nom_mat = NOMBRES_MATERIA.get(mat, mat.capitalize())
+        prom = datos.get("promedio_puntaje", 0)
+        est  = datos.get("estudiantes", 0)
+        tasa = datos.get("tasa_error", 0)
+        emoji = "🟢" if prom >= 80 else "🟡" if prom >= 60 else "🔴"
+        lineas.append(
+            f"  {emoji} {nom_mat}: {prom:.0f}/100  ·  {est} estudiante(s)  ·  "
+            f"tasa de error {int(tasa * 100)}%"
+        )
+
+    if por_tema:
+        bajos = [(t, d) for t, d in por_tema.items() if d.get("promedio_puntaje", 100) < 70]
+        if bajos:
+            lineas.append("")
+            lineas.append("Temas con mayor dificultad:")
+            for tema, d in sorted(bajos, key=lambda x: x[1].get("promedio_puntaje", 0))[:5]:
+                lineas.append(f"  • {tema}: {d.get('promedio_puntaje', 0):.0f}/100")
+
+    return "\n".join(lineas)
+
+
+@app.route("/api/docente/reporte_rapido/estudiante/<int:estudiante_id>", methods=["GET"])
+def docente_reporte_rapido_estudiante(estudiante_id):
+    """Resumen instantaneo sin IA, basado solo en estadisticas de la DB."""
+    if not _verificar_pin(request):
+        return jsonify({"error": "PIN incorrecto"}), 401
+    desempeno = obtener_desempeno_estudiante(estudiante_id)
+    return jsonify({
+        "reporte": _reporte_rapido_estudiante(desempeno),
+        "fuente":  "local",
+    })
+
+
+@app.route("/api/docente/reporte_rapido/clase", methods=["GET"])
+def docente_reporte_rapido_clase():
+    """Resumen instantaneo de la clase sin IA."""
+    if not _verificar_pin(request):
+        return jsonify({"error": "PIN incorrecto"}), 401
+    desempeno = obtener_desempeno_clase()
+    return jsonify({
+        "reporte": _reporte_rapido_clase(desempeno),
+        "fuente":  "local",
+    })
+
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # threaded=True permite que varias peticiones se procesen en paralelo.
+    # Sin esto, mientras Ollama genera una historia (~15-30s), TODAS las demas
+    # peticiones quedan bloqueadas — el boton "Menu" parece no responder, etc.
+    app.run(debug=True, port=5000, threaded=True)

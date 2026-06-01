@@ -1,1 +1,6 @@
 Flask>=3.0,<4
+
+# Voces neurales latinoamericanas (Microsoft Edge TTS) — opcional, ~2MB.
+# Requiere internet la primera vez por texto; luego queda en cache offline.
+# Si no se instala, el sistema cae a Windows SAPI offline automaticamente.
+edge-tts>=6.1

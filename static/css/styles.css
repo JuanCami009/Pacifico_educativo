@@ -296,6 +296,9 @@ label { font-size: 1rem; opacity: 0.85; }
   width: 100%; display: flex; justify-content: space-between;
   align-items: center; padding: 20px 32px;
   background: transparent;
+  /* El contenedor no captura clicks (no tapa el contenido debajo),
+     pero los botones e inputs dentro SÍ son clickeables. */
+  pointer-events: none;
   border: none;
   box-shadow: none;
   position: absolute;
@@ -303,6 +306,15 @@ label { font-size: 1rem; opacity: 0.85; }
   z-index: 100;
 }
 .saludo      { font-size: 1.3rem; font-weight: 800; }
+/* Los botones, inputs y badges dentro del header siempre son clickeables,
+   aunque el contenedor tenga pointer-events: none. */
+.app-header > button,
+.app-header > .btn,
+.app-header > input,
+.app-header > a,
+.app-header > .ia-badge {
+  pointer-events: auto;
+}
 .subtitulo-menu { 
   position: absolute;
   top: 15%;
@@ -408,55 +420,122 @@ label { font-size: 1rem; opacity: 0.85; }
   max-width: 600px; width: 90%;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
 }
+.personaje-banner-img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6));
+  flex-shrink: 0;
+}
 .titulo-nivel { font-size: 1.1rem; font-weight: 700; }
 .niveles-camino {
   display: flex; flex-direction: row; gap: 0;
   align-items: center; justify-content: center;
-  width: 100%; max-width: 900px; padding: 30px 10px;
+  width: 100%; max-width: 1400px; padding: 30px 10px;
   flex-wrap: wrap;
 }
 .nivel-paso { display: flex; align-items: center; }
-.nivel-circulo {
-  width: 120px; height: 120px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 4px solid rgba(255, 255, 255, 0.15);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 3rem; font-weight: 900; color: white;
-  box-shadow: 0 8px 25px rgba(0,0,0,0.7);
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  cursor: pointer;
+/* ── Nodo de nivel con imagen ─────────────────────────────────────── */
+.nivel-nodo {
+  width: 200px;
+  height: 200px;
   position: relative;
   z-index: 2;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  overflow: visible;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+              filter 0.3s ease;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.nivel-nodo-img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: 0;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55));
+}
+.nivel-nodo-num {
+  font-size: 3rem; font-weight: 900; color: white;
 }
 
-.nivel-circulo.disponible { 
-  background: rgba(255, 179, 0, 0.85); 
-  border-color: #ffd54f;
-  color: #3e2723;
-  box-shadow: 0 0 30px rgba(255, 179, 0, 0.5);
+/* Estados — solo glow alrededor de la silueta del PNG */
+.nivel-nodo.disponible .nivel-nodo-img {
   animation: pulso-nivel 2s infinite;
 }
-
-.nivel-circulo.completado { 
-  background: rgba(76, 175, 80, 0.85); 
-  border-color: #a5d6a7;
-  color: white;
+.nivel-nodo.disponible:hover {
+  transform: translateY(-8px) scale(1.06);
+}
+.nivel-nodo.disponible:hover .nivel-nodo-img {
+  filter: brightness(1.1) drop-shadow(0 0 18px rgba(255,213,79,0.95))
+          drop-shadow(0 6px 14px rgba(0,0,0,0.55));
+}
+.nivel-nodo.completado .nivel-nodo-img {
+  filter: drop-shadow(0 0 14px rgba(76,175,80,0.55))
+          drop-shadow(0 6px 14px rgba(0,0,0,0.55));
+}
+.nivel-nodo.completado:hover {
+  transform: translateY(-6px) scale(1.04);
+}
+.nivel-nodo.completado:hover .nivel-nodo-img {
+  filter: brightness(1.08) drop-shadow(0 0 18px rgba(76,175,80,0.75))
+          drop-shadow(0 6px 14px rgba(0,0,0,0.55));
+}
+.nivel-nodo.bloqueado {
+  cursor: not-allowed;
+}
+.nivel-nodo.bloqueado .nivel-nodo-img {
+  opacity: 0.45;
+  filter: grayscale(0.7) brightness(0.55);
 }
 
-.nivel-circulo.bloqueado { 
-  opacity: 0.6; 
-  background: rgba(0,0,0,0.8); 
-  border-color: rgba(255,255,255,0.1);
-  color: rgba(255,255,255,0.2);
-  cursor: not-allowed;
+/* Overlay encima de la imagen — sin fondo cuadrado */
+.nivel-nodo-overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 4px;
+  font-family: 'Fredoka One', cursive;
+  pointer-events: none;
+}
+.nivel-nodo-overlay.locked {
+  background: transparent;
+  font-size: 3rem; color: rgba(255,255,255,0.85);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+}
+.nivel-nodo-overlay.completed {
+  background: transparent;
+  color: #fff;
+  font-size: 1.5rem;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0 12px 14px 0;
+}
+.nivel-nodo-overlay.completed span {
+  font-size: 0.85rem; font-weight: 900;
+  background: rgba(0,0,0,0.6);
+  padding: 3px 10px; border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
 }
 
 @keyframes pulso-nivel {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(249,168,37,0.6); }
-  50%       { box-shadow: 0 0 0 10px rgba(249,168,37,0); }
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(249,168,37,0.55))
+                     drop-shadow(0 6px 14px rgba(0,0,0,0.55)); }
+  50%       { filter: drop-shadow(0 0 18px rgba(249,168,37,0.98))
+                     drop-shadow(0 6px 14px rgba(0,0,0,0.55)); }
+}
+
+/* Mantener clases legacy por si acaso */
+.nivel-circulo {
+  width: 120px; height: 120px; border-radius: 50%;
+  background: rgba(255,179,0,0.85); border: 4px solid #ffd54f;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 3rem; font-weight: 900; color: #3e2723;
+  cursor: pointer; position: relative; z-index: 2;
+  box-shadow: 0 0 30px rgba(255,179,0,0.5);
 }
 .nivel-nombre { 
   margin-top: 16px; font-size: 1.1rem; font-weight: 900; 
@@ -1003,6 +1082,42 @@ label { font-size: 1rem; opacity: 0.85; }
   padding: 8px 12px 4px;
   flex-shrink: 0;
   z-index: 30;
+}
+
+.atrapa-riviel-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 2px solid var(--dorado, #F9A825);
+  border-radius: 50px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 50;
+  pointer-events: none;
+}
+
+.atrapa-riviel-banner-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: contain;
+  border: 2px solid rgba(93, 64, 55, 0.35);
+  background: rgba(255,255,255,0.4);
+  flex-shrink: 0;
+}
+
+.atrapa-riviel-banner-texto {
+  font-family: 'Fredoka One', cursive;
+  font-size: 0.95rem;
+  color: #3e2723;
+  line-height: 1.2;
 }
 
 .atrapa-vidas {
@@ -1775,9 +1890,35 @@ label { font-size: 1rem; opacity: 0.85; }
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(11, 28, 61, 0.96);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* Header con look de pergamino/madera como el resto del juego */
+  background: linear-gradient(180deg, rgba(40,20,8,0.88) 0%, rgba(58,30,12,0.92) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 2px solid rgba(255,179,0,0.35);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.45);
+}
+.docente-titulo-header {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.4rem;
+  color: #ffd54f;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+  display: flex; align-items: center; gap: 10px;
+}
+.reporte-ia-cargando {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 213, 79, 0.15);
+  border: 1px dashed rgba(255, 213, 79, 0.5);
+  border-radius: 10px;
+  color: #ffd54f;
+  font-size: 0.9rem;
+  font-style: italic;
+  display: flex; align-items: center; gap: 8px;
+  animation: pulso-suave 2s ease-in-out infinite;
+}
+@keyframes pulso-suave {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
 }
 
 .docente-titulo-header {
@@ -1935,6 +2076,184 @@ label { font-size: 1rem; opacity: 0.85; }
 
 .docente-acceso-btn:hover {
   color: rgba(255, 255, 255, 0.65) !important;
+}
+
+/* ══════════════════════════════════════════════════════
+   PANTALLA "¡NUEVA MISIÓN!" (screen-mision)
+════════════════════════════════════════════════════════ */
+.screen-mision {
+  /* NO sobrescribir position:fixed heredado de .screen */
+  overflow: hidden;
+  padding: 0;
+  background: #000; /* tapa el body mientras carga la imagen */
+  justify-content: center;
+}
+
+/* Fondo de imagen que llena toda la pantalla */
+.mision-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  z-index: 0;
+}
+/* Gradiente suave solo en la franja inferior para que los botones sean legibles */
+.mision-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 72%,
+    rgba(0,0,0,0.72) 100%
+  );
+}
+
+/* ── Texto superpuesto sobre el pergamino de la imagen ── */
+/* El pergamino ocupa aprox. x:28%-73%, y:27%-64% de la imagen 16:9 */
+.mision-texto-overlay {
+  position: absolute;
+  left: 26%;
+  right: 31%;
+  top: 27%;
+  bottom: 34%;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  padding: 18px 28px 10px;
+  overflow: hidden;
+  /* flex-wrap para que el botón TTS quede a la derecha */
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ── Botón TTS (Text-to-Speech) ── */
+.btn-tts-mision {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid rgba(61, 31, 0, 0.35);
+  background: rgba(255, 244, 210, 0.85);
+  color: #5a2d00;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  z-index: 3;
+  flex-shrink: 0;
+}
+.btn-tts-mision:hover {
+  background: rgba(255, 230, 150, 0.95);
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+.btn-tts-mision.tts-hablando {
+  background: rgba(255, 179, 0, 0.9);
+  color: #2c1a00;
+  animation: tts-pulso 1.2s ease-in-out infinite;
+  border-color: rgba(180, 100, 0, 0.5);
+}
+@keyframes tts-pulso {
+  0%, 100% { box-shadow: 0 2px 8px rgba(255,179,0,0.4); }
+  50%       { box-shadow: 0 0 18px rgba(255,179,0,0.85); }
+}
+.btn-tts-mision.hidden { display: none; }
+
+.mision-historia-texto {
+  color: #3d1f00;
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.7;
+  width: 100%;
+}
+.mision-loading {
+  color: #7a5800;
+  font-style: italic;
+  font-weight: 600;
+}
+
+/* ── Botones en la franja inferior ── */
+.mision-acciones {
+  position: absolute;
+  bottom: 12%;
+  left: 0; right: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0 24px 26px;
+}
+.mision-btn-jugar {
+  width: 100%;
+  max-width: 480px;
+  font-size: 1.3rem;
+  letter-spacing: 2px;
+  padding: 16px 0;
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 0 30px rgba(255,179,0,0.4);
+}
+.mision-acciones-sec {
+  position: absolute;
+  bottom: 2%;
+  left: 0; right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 24px 8px;
+  z-index: 3;
+}
+.mision-acciones-sec .btn-grande {
+  width: auto;
+  min-width: 260px;
+  margin-top: 0;
+}
+
+/* Pantalla sin imagen de fondo (otras materias) */
+.screen-mision:not(.mision-con-imagen) {
+  background: radial-gradient(ellipse at center, #1a3a2a 0%, #0a1a12 100%);
+}
+.screen-mision:not(.mision-con-imagen) .mision-texto-overlay {
+  position: relative;
+  left: auto; right: auto; top: auto; bottom: auto;
+  background: rgba(255,255,255,0.95);
+  border: 3px solid #ffd54f;
+  border-radius: 24px;
+  padding: 20px 28px;
+  max-width: 600px;
+  width: 90%;
+  margin: auto 0;
+  flex-shrink: 0;
+}
+.screen-mision:not(.mision-con-imagen) .mision-historia-texto {
+  color: #2c1a0e;
+}
+.screen-mision:not(.mision-con-imagen) .mision-acciones {
+  position: relative;
+  bottom: auto;
+  padding: 16px 24px 40px;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .mision-texto-overlay {
+    left: 5%;
+    right: 5%;
+    top: 23%;
+    bottom: 30%;
+    padding: 10px 14px;
+  }
+  .mision-historia-texto { font-size: 1rem; line-height: 1.55; }
+  .mision-btn-jugar { font-size: 1.1rem; }
 }
 
 /* ══════════════════════════════════════════════════════

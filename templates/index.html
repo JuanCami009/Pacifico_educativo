@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-  <link rel="stylesheet" href="/static/css/styles.css?v=1.4">
+  <link rel="stylesheet" href="/static/css/styles.css?v=2.9">
 </head>
 <body>
 
@@ -116,14 +116,14 @@
   <header class="app-header">
     <button id="btn-cambiar-usuario"
       class="btn btn-ghost btn-sm"
-      style="position:relative;z-index:200;"
-      onclick="localStorage.removeItem('pacifico_estado_v2'); window.location.reload();"
+      style="position:relative; z-index:9999; pointer-events:auto;"
+      onclick="try{localStorage.removeItem('pacifico_estado_v2');}catch(e){} location.reload();"
     >← Cambiar usuario</button>
     <div id="saludo-header" class="saludo" style="pointer-events:none;">Hola!</div>
     <button id="btn-puntajes"
       class="btn btn-outline btn-sm"
-      style="position:relative;z-index:200;"
-      onclick="mostrarPuntajes()"
+      style="position:relative; z-index:9999; pointer-events:auto;"
+      onclick="window.__verPuntajes && window.__verPuntajes();"
     >📊 Mis Puntajes</button>
   </header>
   <p class="subtitulo-menu">¿Qué quieres aprender hoy?</p>
@@ -133,7 +133,10 @@
 <!-- PANTALLA 3: SELECCIÓN DE NIVEL -->
 <div id="screen-level-select" class="screen">
   <header class="app-header">
-    <button id="btn-volver-menu" class="btn btn-outline btn-sm">← Menú</button>
+    <button id="btn-volver-menu"
+            class="btn btn-outline btn-sm"
+            style="position:relative; z-index:9999; pointer-events:auto;"
+            onclick="window.__volverAlMenu && window.__volverAlMenu();">← Menú</button>
     <div id="level-select-titulo" class="titulo-nivel"></div>
     <div></div>
   </header>
@@ -141,18 +144,37 @@
   <div class="niveles-camino" id="niveles-camino"></div>
 </div>
 
-<!-- PANTALLA 4: INTRO DEL PERSONAJE -->
-<div id="screen-personaje" class="screen">
-  <div class="personaje-intro-wrapper">
-    <div class="card personaje-card">
-      <div id="pers-emoji" class="personaje-emoji-grande"></div>
-      <h2 id="pers-nombre" class="personaje-nombre"></h2>
-      <p id="pers-nivel" class="personaje-nivel-label"></p>
-      <blockquote id="pers-frase" class="personaje-frase"></blockquote>
-      <button id="btn-jugar" class="btn btn-primary btn-grande">¡Jugar! <i class="fa-solid fa-gamepad" style="margin-left: 4px;"></i></button>
-      <button id="btn-chat-personaje" class="btn btn-outline btn-grande" onclick="abrirChat()">💬 Hablar con el personaje</button>
-      <button id="btn-volver-level" class="btn btn-ghost btn-sm">← Volver</button>
+<!-- PANTALLA 4: NUEVA MISIÓN (reemplaza intro del personaje) -->
+<div id="screen-mision" class="screen screen-mision">
+  <!-- Imagen de fondo de la misión (se cambia por JS) -->
+  <div id="mision-bg" class="mision-bg"></div>
+
+  <!-- Audio TTS offline (src se asigna por JS) -->
+  <audio id="mision-audio" preload="none"></audio>
+
+  <!-- Texto superpuesto sobre el pergamino/cuadro que ya viene en la imagen -->
+  <div class="mision-texto-overlay">
+    <div id="mision-historia-texto" class="mision-historia-texto">
+      <span class="mision-loading"><i class="fa-solid fa-spinner fa-spin"></i> El personaje está preparando tu misión...</span>
     </div>
+    <!-- Botón TTS (se oculta si el browser no soporta SpeechSynthesis) -->
+    <button id="btn-tts-mision" class="btn-tts-mision hidden" onclick="toggleTTS()" title="Escuchar historia">
+      <i class="fa-solid fa-volume-high"></i>
+    </button>
+  </div>
+
+  <!-- Botón principal JUGAR (posición media-baja) -->
+  <div class="mision-acciones">
+    <button id="btn-jugar" class="btn btn-primary btn-grande mision-btn-jugar">
+      ¡JUGAR! <i class="fa-solid fa-play" style="margin-left:6px;"></i>
+    </button>
+  </div>
+  <!-- Botones secundarios (pegados al fondo) -->
+  <div class="mision-acciones-sec">
+    <button id="btn-chat-personaje" class="btn btn-outline btn-grande" onclick="abrirChat()">
+      💬 Hablar con el personaje
+    </button>
+    <button id="btn-volver-level" class="btn btn-ghost btn-sm">← Volver</button>
   </div>
 </div>
 
@@ -237,10 +259,10 @@
 <script src="/static/js/point_and_click.js?v=1.3"></script>
 <script src="/static/js/drag_and_drop.js?v=1.3"></script>
 <script src="/static/js/puzzle.js?v=1.3"></script>
-<script src="/static/js/atrapa_ranas.js?v=1.3"></script>
+<script src="/static/js/atrapa_ranas.js?v=1.4"></script>
 <script src="/static/js/mate_niveles.js?v=1.0"></script>
 <script src="/static/js/ia_chat.js?v=1.0"></script>
-<script src="/static/js/app.js?v=1.6"></script>
-<script src="/static/js/docente.js?v=1.0"></script>
+<script src="/static/js/app.js?v=2.5"></script>
+<script src="/static/js/docente.js?v=1.1"></script>
 </body>
 </html>

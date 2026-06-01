@@ -169,25 +169,57 @@
 
     box.classList.remove('hidden');
     var nombreMostrar = tipo === 'clase' ? 'la clase' : (est ? est.nombre : '');
-    setLoading(box, 'Generando reporte de ' + nombreMostrar + '...');
+
+    // ── PASO 1: Reporte RAPIDO local (instantaneo, sin IA) ─────────────────
+    var urlRapida = tipo === 'clase'
+      ? '/api/docente/reporte_rapido/clase'
+      : '/api/docente/reporte_rapido/estudiante/' + est.id;
+
+    setLoading(box, 'Cargando resumen...');
     if (tipo === 'clase' && btnClase) btnClase.disabled = true;
 
-    var qs  = regenerar ? '?regenerar=1' : '';
-    var url = tipo === 'clase'
-      ? '/api/docente/reporte/clase' + qs
-      : '/api/docente/reporte/estudiante/' + est.id + qs;
-
-    fetch(url, { method: 'POST', headers: { 'X-Docente-Pin': _pin } })
+    fetch(urlRapida, { method: 'GET', headers: { 'X-Docente-Pin': _pin } })
       .then(function (res) { return res.json().then(function (d) { return { ok: res.ok, datos: d }; }); })
       .then(function (r) {
-        if (!r.ok) { setError(box, r.datos.error || 'No se pudo generar el reporte.'); return; }
-        renderReporte(box, r.datos);
+        if (r.ok) {
+          renderReporte(box, r.datos);
+          // ── PASO 2: Mejorar con IA en background (opcional) ─────────────
+          mejorarConIA(tipo, est, regenerar, box);
+        } else {
+          setError(box, r.datos.error || 'No se pudo generar el reporte.');
+        }
       })
       .catch(function () {
         setError(box, 'Error de conexión. Verifica que el servidor esté activo.');
       })
       .finally(function () {
         if (tipo === 'clase' && btnClase) btnClase.disabled = false;
+      });
+  }
+
+  function mejorarConIA(tipo, est, regenerar, box) {
+    var qs  = regenerar ? '?regenerar=1' : '';
+    var url = tipo === 'clase'
+      ? '/api/docente/reporte/clase' + qs
+      : '/api/docente/reporte/estudiante/' + est.id + qs;
+
+    // Indicador discreto de "mejorando con IA"
+    var aviso = makeEl('div', { className: 'reporte-ia-cargando' });
+    aviso.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Mejorando con IA en segundo plano...';
+    box.appendChild(aviso);
+
+    fetch(url, { method: 'POST', headers: { 'X-Docente-Pin': _pin } })
+      .then(function (res) { return res.json().then(function (d) { return { ok: res.ok, datos: d }; }); })
+      .then(function (r) {
+        if (r.ok && r.datos.reporte) {
+          renderReporte(box, r.datos);
+        } else {
+          // Si IA falla, quitar el aviso y dejar el reporte local
+          if (aviso && aviso.parentNode) aviso.parentNode.removeChild(aviso);
+        }
+      })
+      .catch(function () {
+        if (aviso && aviso.parentNode) aviso.parentNode.removeChild(aviso);
       });
   }
 

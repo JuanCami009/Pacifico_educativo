@@ -91,6 +91,10 @@
       </div>
       <div class="atrapa-zona-vuelo" id="atrapa-zona-vuelo">
         <div class="atrapa-sombra-rio" aria-hidden="true"></div>
+        <div class="atrapa-riviel-banner" id="atrapa-riviel-banner">
+          <img class="atrapa-riviel-banner-img" src="${URLS.riviel}" alt="El Riviel" />
+          <span class="atrapa-riviel-banner-texto" id="atrapa-riviel-texto">Cargando...</span>
+        </div>
       </div>
       <div class="atrapa-zona-tronco" id="atrapa-zona-tronco">
         <div class="atrapa-tronco" aria-hidden="true"></div>
@@ -110,6 +114,7 @@
 
     const elVidas = root.querySelector('#atrapa-vidas');
     const elMensajeGlobal = document.getElementById('instruccion-texto');
+    const elRivielTexto = root.querySelector('#atrapa-riviel-texto');
     const zonaVuelo = root.querySelector('#atrapa-zona-vuelo');
     const gaviotaHost = root.querySelector('#atrapa-gaviota-host');
     const gaviotaInner = root.querySelector('#atrapa-gaviota-inner');
@@ -157,9 +162,11 @@
     }
 
     function actualizarMensajePrincipal() {
+      const msg = `¡Atrapa solo los cangrejos con el número <b>${numeroPedido}</b>!`;
       if (elMensajeGlobal) {
-        elMensajeGlobal.innerHTML = `<img src="${URLS.riviel}" style="width:32px; height:32px; object-fit:contain; vertical-align:middle; margin-right:8px; border-radius:50%; border:2px solid var(--dorado); background:rgba(255,255,255,0.4);" alt=""/> ¡Atrapa solo los cangrejos con el número ${numeroPedido}!`;
+        elMensajeGlobal.innerHTML = `<img src="${URLS.riviel}" style="width:32px; height:32px; object-fit:contain; vertical-align:middle; margin-right:8px; border-radius:50%; border:2px solid var(--dorado); background:rgba(255,255,255,0.4);" alt=""/> ${msg}`;
       }
+      if (elRivielTexto) elRivielTexto.innerHTML = msg;
     }
 
     function rangoNumeroPorRonda(nr) {
@@ -319,6 +326,7 @@
       if (elMensajeGlobal) {
         elMensajeGlobal.innerHTML = `<img src="${URLS.riviel}" style="width:32px; height:32px; object-fit:contain; vertical-align:middle; margin-right:8px; border-radius:50%; border:2px solid var(--dorado); background:rgba(255,255,255,0.4);" alt=""/> ${f}`;
       }
+      if (elRivielTexto) elRivielTexto.innerHTML = `<i>${f}</i>`;
       if (timeoutAlientoId) clearTimeout(timeoutAlientoId);
       timeoutAlientoId = setTimeout(() => {
         timeoutAlientoId = 0;
