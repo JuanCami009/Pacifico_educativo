@@ -26,13 +26,16 @@ from data.reporte_fallback import generar_reporte_fallback
 
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
+# llama3.2:1b — modelo por defecto: rapido, ~1.3GB. El usuario puede cambiarlo
+# desde la pantalla de inicio (selector) si tiene mas modelos descargados.
 MODELO_DEFECTO = os.getenv("OLLAMA_MODEL", "llama3.2:1b")
 MODELO_RESPALDO = "tinyllama"
-TIMEOUT_SEGUNDOS = 40        # llama3.2:1b necesita ~15-25s. qwen2.5:0.5b ~3-6s
-MAX_TOKENS = 80              # mas corto = MUCHO mas rapido. Antes 120
+TIMEOUT_SEGUNDOS = 60
+MAX_TOKENS = 120
 TEMPERATURA = 0.7
 CACHE_MAX = 30
-KEEP_ALIVE = "10m"           # mantener el modelo en RAM 10 min entre llamadas
+KEEP_ALIVE = "15m"
+CONTEXTO_TOKENS = 4096
 
 
 SYSTEM_PROMPTS = {
@@ -125,6 +128,37 @@ class ServicioIA:
         self._ultima_verificacion = 0.0
         self._ultimo_error = ""
 
+    def cambiar_modelo(self, nuevo_modelo: str) -> dict:
+        """Cambia el modelo activo en runtime y lo verifica."""
+        nuevo_modelo = (nuevo_modelo or "").strip()
+        if not nuevo_modelo:
+            return {"ok": False, "error": "Modelo vacio"}
+        anterior = self.modelo
+        self.modelo = nuevo_modelo
+        # Forzar reverificacion (no usar cache)
+        self._disponible = None
+        self._ultima_verificacion = 0.0
+        ok = self.verificar_disponibilidad()
+        if ok:
+            print(f"[IA] Modelo cambiado: '{anterior}' -> '{nuevo_modelo}'")
+            return {"ok": True, "modelo": self.modelo}
+        # Revertir si fallo
+        self.modelo = anterior
+        self._disponible = None
+        self._ultima_verificacion = 0.0
+        return {"ok": False, "error": f"El modelo '{nuevo_modelo}' no esta disponible en Ollama.", "modelo": anterior}
+
+    def listar_modelos_instalados(self) -> list[str]:
+        """Devuelve la lista de modelos instalados en Ollama. Vacia si Ollama no responde."""
+        try:
+            req = urllib_request.Request(f"{self.url}/api/tags", method="GET")
+            with urllib_request.urlopen(req, timeout=3) as resp:
+                datos = json.loads(resp.read().decode("utf-8"))
+                return sorted([m.get("name", "") for m in datos.get("models", []) if m.get("name")])
+        except Exception as e:
+            print(f"[IA] No se pudieron listar modelos: {e}")
+            return []
+
     def estado(self) -> dict:
         disponible = self.verificar_disponibilidad()
         return {
@@ -192,6 +226,9 @@ class ServicioIA:
         return " ".join(partes)
 
     def verificar_disponibilidad(self) -> bool:
+        # Override global desde la UI: si IA esta apagada, reportar como no disponible.
+        if os.getenv("IA_GLOBAL_OFF") == "1":
+            return False
         ahora = time.time()
         if self._disponible is not None and (ahora - self._ultima_verificacion) < 30:
             return self._disponible
@@ -401,10 +438,11 @@ class ServicioIA:
                 {"role": "user", "content": mensaje},
             ],
             "stream": False,
-            "keep_alive": KEEP_ALIVE,   # mantener modelo en RAM 10 min
+            "keep_alive": KEEP_ALIVE,   # mantener modelo en RAM
             "options": {
                 "temperature": TEMPERATURA,
                 "num_predict": max_tokens if max_tokens is not None else MAX_TOKENS,
+                "num_ctx": CONTEXTO_TOKENS,  # ventana 4k = rapida y suficiente
                 "top_p": 0.9,
                 "repeat_penalty": 1.1,
             },
@@ -674,12 +712,23 @@ class ServicioIA:
 
         resumen = _construir_resumen_desempeno(desempeno, ambito, nombre)
         prompt = (
-            f"Analiza el siguiente desempeno estudiantil y genera un reporte "
-            f"pedagogico para el docente:\n\n{resumen}\n\n"
-            f"Incluye: diagnostico de dificultades, fortalezas observadas "
-            f"y 3 recomendaciones pedagogicas especificas."
+            f"DATOS DEL ESTUDIANTE (ya tienes toda la informacion necesaria, NO pidas mas):\n"
+            f"{resumen}\n\n"
+            f"INSTRUCCION: Con los datos de arriba, escribe un reporte pedagogico breve "
+            f"para el docente. No pidas mas informacion. Usa los datos tal cual estan.\n\n"
+            f"Estructura del reporte (escribela tal cual, llenando con los datos):\n"
+            f"1. Resumen: una linea con el promedio general y el nivel completado.\n"
+            f"2. Fortalezas: 1-2 puntos basados en las materias con mejor desempeno.\n"
+            f"3. Dificultades: 1-2 puntos basados en las materias o temas con peor desempeno. "
+            f"Si no hay dificultades, escribe 'No se detectan dificultades importantes'.\n"
+            f"4. Recomendaciones pedagogicas: 3 acciones concretas para el docente.\n\n"
+            f"Responde directamente con el reporte, sin saludos ni preguntas."
         )
-        system = f"{SYSTEM_PROMPT_DOCENTE} {REGLAS_REPORTE_DOCENTE}"
+        system = (
+            f"{SYSTEM_PROMPT_DOCENTE} {REGLAS_REPORTE_DOCENTE} "
+            f"NUNCA pidas mas informacion al usuario. NUNCA digas 'lo siento' o 'necesito mas datos'. "
+            f"Usa SOLO los datos que te dan en el mensaje. Si los datos son escasos, igualmente genera el reporte."
+        )
 
         respuesta = self._llamar_ollama(
             personaje="",
@@ -689,7 +738,22 @@ class ServicioIA:
             normalizar=False,
         )
 
+        # Validar la respuesta: si el modelo "alucina pidiendo datos", caer al fallback
+        respuesta_invalida = False
         if respuesta:
+            r_lower = respuesta.lower()
+            frases_malas = [
+                "lo siento", "necesitaria", "necesitaría", "necesito mas",
+                "necesito más", "podrias proporcionar", "podrías proporcionar",
+                "puedes proporcionarme", "puedes darme", "no tengo informacion",
+                "no tengo información", "no se proporciono", "no se proporcionó",
+                "mas detalles", "más detalles", "mas informacion", "más información",
+            ]
+            if any(f in r_lower for f in frases_malas):
+                respuesta_invalida = True
+                print(f"[IA] Reporte rechazado (modelo pidio mas datos): {respuesta[:100]}...")
+
+        if respuesta and not respuesta_invalida:
             return {
                 "respuesta":  respuesta,
                 "fuente":     "ollama",
@@ -698,13 +762,14 @@ class ServicioIA:
                 "error":      "",
             }
 
+        # Fallback determinista basado solo en los datos de la DB
         reporte = generar_reporte_fallback(desempeno, ambito)
         return {
             "respuesta":  reporte,
             "fuente":     "fallback",
             "modelo":     self.modelo,
             "disponible": False,
-            "error":      self._ultimo_error,
+            "error":      self._ultimo_error or "Modelo no genero reporte util",
         }
 
     def _normalizar_respuesta(self, texto: str) -> str:
@@ -716,35 +781,53 @@ class ServicioIA:
 
 
 def _construir_resumen_desempeno(desempeno: dict, ambito: str, nombre: str = '') -> str:
-    """Genera texto resumido del desempeño para incluir en el prompt de Ollama."""
+    """Genera texto resumido y legible del desempeno para incluir en el prompt."""
+    NOMBRES_MAT = {
+        'matematicas': 'Matemáticas',
+        'lenguaje':    'Lenguaje',
+        'ingles':      'Inglés',
+        'biologia':    'Biología',
+    }
     lineas = []
 
     if ambito == 'clase':
         total = desempeno.get('total_estudiantes', 0)
-        lineas.append(f"Clase completa ({total} estudiantes):")
+        lineas.append(f"AMBITO: Clase completa con {total} estudiantes activos.")
     else:
         nom = nombre or desempeno.get('nombre', 'Estudiante')
-        lineas.append(f"Estudiante: {nom}")
+        lineas.append(f"ESTUDIANTE: {nom}")
 
-    por_materia = desempeno.get('por_materia', {})
+    por_materia = desempeno.get('por_materia') or {}
     if por_materia:
-        lineas.append("Desempeno por materia (promedio/100):")
-        for mat, d in sorted(por_materia.items(), key=lambda x: x[1].get('promedio_puntaje', 0)):
+        # Promedio general
+        promedios = [d.get('promedio_puntaje', 0) for d in por_materia.values()]
+        prom_general = sum(promedios) / len(promedios) if promedios else 0
+        lineas.append(f"PROMEDIO GENERAL: {prom_general:.0f}/100")
+
+        lineas.append("DESEMPENO POR MATERIA:")
+        for mat, d in sorted(por_materia.items(), key=lambda x: x[1].get('promedio_puntaje', 0), reverse=True):
+            nom_mat = NOMBRES_MAT.get(mat, mat.capitalize())
             prom = d.get('promedio_puntaje', 0)
             niv  = d.get('niveles_completados') or d.get('estudiantes') or 0
             terr = d.get('tasa_error', 0)
-            lineas.append(f"  - {mat}: {prom:.0f}/100, {niv} niveles, tasa error {terr:.0%}")
+            etiqueta_nivel = 'niveles completados' if ambito == 'estudiante' else 'estudiantes participantes'
+            categoria = ('FUERTE' if prom >= 80 else 'REGULAR' if prom >= 60 else 'DEBIL')
+            lineas.append(
+                f"  - {nom_mat} [{categoria}]: puntaje {prom:.0f}/100, "
+                f"{niv} {etiqueta_nivel}, tasa de error {int(terr*100)}%"
+            )
+    else:
+        lineas.append("NOTA: Aun no hay materias con desempeno registrado.")
 
-    por_tema = desempeno.get('por_tema', {})
+    por_tema = desempeno.get('por_tema') or {}
     if por_tema:
-        temas_bajos = {t: d for t, d in por_tema.items() if d.get('promedio_puntaje', 100) < 60}
+        temas_bajos = {t: d for t, d in por_tema.items() if d.get('promedio_puntaje', 100) < 70}
         if temas_bajos:
-            lineas.append("Temas con mayor dificultad (promedio < 60):")
-            for tema, d in sorted(temas_bajos.items(), key=lambda x: x[1].get('promedio_puntaje', 100)):
+            lineas.append("TEMAS CON DIFICULTAD (puntaje < 70):")
+            for tema, d in sorted(temas_bajos.items(), key=lambda x: x[1].get('promedio_puntaje', 100))[:6]:
                 lineas.append(f"  - {tema}: {d.get('promedio_puntaje', 0):.0f}/100")
-
-    if not por_materia:
-        lineas.append("Sin datos de desempeno registrados aun.")
+        else:
+            lineas.append("TEMAS CON DIFICULTAD: ninguno (todos los temas registrados estan por encima de 70).")
 
     return '\n'.join(lineas)
 

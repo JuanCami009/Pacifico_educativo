@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-  <link rel="stylesheet" href="/static/css/styles.css?v=2.9">
+  <link rel="stylesheet" href="/static/css/styles.css?v=3.3">
 </head>
 <body>
 
@@ -23,6 +23,27 @@
       <input id="nombre-input" type="text" placeholder="Escribe tu nombre aquí..." maxlength="30" autocomplete="off">
       <button id="btn-entrar" class="btn btn-primary btn-grande">¡Entrar a la aventura! 🚀</button>
       <p id="intro-error" class="error-msg hidden"></p>
+
+      <!-- Toggle de IA: si esta apagado, no se hacen llamadas a Ollama -->
+      <div class="ia-toggle-row">
+        <label class="ia-toggle-switch" for="ia-toggle-input">
+          <input id="ia-toggle-input" type="checkbox">
+          <span class="ia-toggle-slider"></span>
+        </label>
+        <div class="ia-toggle-texto">
+          <strong>Modo IA</strong>
+          <small id="ia-toggle-desc">Apagado · Historias y chat predefinidos (rápido, sin internet)</small>
+        </div>
+      </div>
+
+      <!-- Selector de modelo (visible solo cuando IA esta encendida) -->
+      <div id="ia-modelo-row" class="ia-modelo-row hidden">
+        <label for="ia-modelo-select"><i class="fa-solid fa-microchip"></i> Modelo de IA</label>
+        <select id="ia-modelo-select" class="ia-modelo-select">
+          <option value="">Cargando modelos…</option>
+        </select>
+        <small id="ia-modelo-estado" class="ia-modelo-estado"></small>
+      </div>
     </div>
     <!-- Lista de usuarios guardados -->
     <div id="usuarios-guardados" class="usuarios-guardados-panel hidden">
@@ -262,7 +283,7 @@
 <script src="/static/js/atrapa_ranas.js?v=1.4"></script>
 <script src="/static/js/mate_niveles.js?v=1.0"></script>
 <script src="/static/js/ia_chat.js?v=1.0"></script>
-<script src="/static/js/app.js?v=2.5"></script>
+<script src="/static/js/app.js?v=3.3"></script>
 <script src="/static/js/docente.js?v=1.1"></script>
 </body>
 </html>

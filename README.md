@@ -42,14 +42,20 @@ Esto solo instala Flask. Todo lo demas (SQLite, TTS, IA) ya viene incluido en Py
 Descargar el modelo de IA (solo la primera vez, requiere internet):
 
 ```bat
+ollama pull llama3.2:3b
+```
+
+Este es el modelo recomendado — entiende espanol nativamente y sigue
+instrucciones complejas. Pesa ~2 GB en disco y RAM. Velocidad: 5-15
+tokens/segundo en CPU promedio.
+
+Alternativa mas liviana para PCs con muy pocos recursos (< 4 GB RAM libre):
+
+```bat
 ollama pull llama3.2:1b
 ```
 
-Alternativa mas liviana para PCs con pocos recursos:
-
-```bat
-ollama pull tinyllama
-```
+(Mas rapido, ~1.3 GB, pero calidad de espanol notablemente menor.)
 
 ---
 

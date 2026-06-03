@@ -30,6 +30,49 @@ from data.niveles_contenido import obtener_datos_nivel_completo
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
+
+# ── Caching y servir WebP automaticamente cuando se pide PNG/JPG ───────────────
+
+_STATIC_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+
+
+@app.before_request
+def _redirigir_a_webp_si_existe():
+    """
+    Si el cliente pide /static/.../foo.png pero existe foo.webp al lado,
+    redirigir transparente: misma URL pero servida desde el archivo WebP.
+    Reduce el peso ~90% sin tocar el frontend.
+    """
+    path = request.path
+    if not path.startswith("/static/"):
+        return
+    if not path.lower().endswith((".png", ".jpg", ".jpeg")):
+        return
+    # Construir ruta del archivo .webp candidato
+    rel = path[len("/static/"):]
+    sin_ext = rel.rsplit(".", 1)[0]
+    candidato_webp = os.path.join(_STATIC_ROOT, sin_ext + ".webp")
+    if os.path.exists(candidato_webp):
+        # Servir el WebP directamente
+        from flask import send_from_directory
+        carpeta = os.path.dirname(candidato_webp)
+        archivo = os.path.basename(candidato_webp)
+        resp = send_from_directory(carpeta, archivo)
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        resp.headers["Content-Type"] = "image/webp"
+        return resp
+
+
+@app.after_request
+def _cache_headers_estatico(response):
+    """Cache largo para archivos estaticos (1 ano). El versionado ?v=N
+    fuerza la recarga cuando cambia el CSS/JS."""
+    if request.path.startswith("/static/"):
+        # No sobrescribir si ya se puso un header arriba
+        if "Cache-Control" not in response.headers:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
+
 # Inicializar la base de datos al arrancar el servidor
 inicializar_base_de_datos()
 
@@ -318,6 +361,7 @@ def ia_historia_nivel():
 
     contexto_nivel = _obtener_contexto_ia_nivel(materia, nivel) if materia and nivel else None
 
+    # La preferencia IA on/off se aplica via IA_GLOBAL_OFF (gestionada por /api/configuracion/ia)
     resultado = servicio_ia.generar_historia_nivel(
         personaje    = personaje,
         materia      = materia,
@@ -443,6 +487,58 @@ def docente_reporte_clase():
         "reporte": resultado["respuesta"],
         "fuente":  resultado["fuente"],
     })
+
+
+# ── Preferencia global de IA (encendida/apagada desde la UI) ──────────────────
+
+IA_ACTIVA = {"valor": False}   # estado en memoria, configurable por el cliente
+
+
+@app.route("/api/ia/modelos", methods=["GET"])
+def ia_modelos_disponibles():
+    """Devuelve la lista de modelos instalados localmente en Ollama y el activo."""
+    instalados = servicio_ia.listar_modelos_instalados()
+    return jsonify({
+        "modelos":  instalados,
+        "activo":   servicio_ia.modelo,
+        "ollama_ok": len(instalados) > 0,
+    })
+
+
+@app.route("/api/ia/modelo", methods=["POST"])
+def ia_cambiar_modelo():
+    """Cambia el modelo activo en runtime. Body: {modelo: 'llama3.2:1b'}."""
+    datos = request.get_json(silent=True) or {}
+    nuevo = (datos.get("modelo") or "").strip()
+    resultado = servicio_ia.cambiar_modelo(nuevo)
+    return jsonify(resultado), (200 if resultado.get("ok") else 400)
+
+
+@app.route("/api/configuracion/ia", methods=["POST", "GET"])
+def configurar_ia():
+    """
+    Toggle global. El frontend lo manda al iniciar y al cambiar el switch.
+    Si esta apagada, TODOS los endpoints de IA usan SIEMPRE los textos curados
+    (sin llamar a Ollama). Util para Vercel/serverless o ninos sin internet.
+
+    Funciona seteando IA_GLOBAL_OFF en el entorno del proceso — el servicio_ia
+    revisa esa variable en cada verificar_disponibilidad().
+    """
+    if request.method == "POST":
+        datos = request.get_json(silent=True) or {}
+        IA_ACTIVA["valor"] = bool(datos.get("activa", False))
+        if IA_ACTIVA["valor"]:
+            os.environ.pop("IA_GLOBAL_OFF", None)
+            os.environ["OLLAMA_HISTORIAS"] = "1"
+        else:
+            os.environ["IA_GLOBAL_OFF"] = "1"
+            os.environ["OLLAMA_HISTORIAS"] = "0"
+    return jsonify({"activa": IA_ACTIVA["valor"]})
+
+
+def _ia_permitida() -> bool:
+    """Helper para que los endpoints decidan si llamar a Ollama o no."""
+    return IA_ACTIVA["valor"]
 
 
 # ── Reportes RAPIDOS sin IA (basados solo en estadisticas de la DB) ───────────

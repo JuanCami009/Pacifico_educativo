@@ -1890,20 +1890,112 @@ label { font-size: 1rem; opacity: 0.85; }
   position: sticky;
   top: 0;
   z-index: 50;
-  /* Header con look de pergamino/madera como el resto del juego */
-  background: linear-gradient(180deg, rgba(40,20,8,0.88) 0%, rgba(58,30,12,0.92) 100%);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-bottom: 2px solid rgba(255,179,0,0.35);
-  box-shadow: 0 4px 18px rgba(0,0,0,0.45);
+  /* Glass + degradado oscuro azulado para que combine con cualquier fondo */
+  background: linear-gradient(180deg,
+              rgba(10, 22, 38, 0.78) 0%,
+              rgba(10, 22, 38, 0.62) 100%);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 1px solid rgba(255, 213, 79, 0.22);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  padding: 14px 28px;
 }
-.docente-titulo-header {
-  font-family: 'Fredoka One', cursive;
-  font-size: 1.4rem;
+/* ── Toggle IA en pantalla de login ────────────────────────────────────── */
+.ia-toggle-row {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 16px; padding: 12px 14px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+}
+.ia-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px; height: 28px;
+  flex-shrink: 0;
+}
+.ia-toggle-switch input { opacity: 0; width: 0; height: 0; }
+.ia-toggle-slider {
+  position: absolute; cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #4a3322;
+  border-radius: 28px;
+  transition: background 0.25s ease;
+}
+.ia-toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 22px; width: 22px;
+  left: 3px; bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.25s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+.ia-toggle-switch input:checked + .ia-toggle-slider {
+  background: linear-gradient(135deg, #ff9800, #ffd54f);
+}
+.ia-toggle-switch input:checked + .ia-toggle-slider::before {
+  transform: translateX(22px);
+}
+.ia-toggle-texto {
+  display: flex; flex-direction: column; text-align: left;
+  flex: 1;
+}
+.ia-toggle-texto strong { color: #ffd54f; font-size: 1rem; }
+.ia-toggle-texto small { color: rgba(255,255,255,0.7); font-size: 0.78rem; margin-top: 2px; }
+
+/* Selector de modelo Ollama */
+.ia-modelo-row {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,213,79,0.25);
+  border-radius: 12px;
+  text-align: left;
+  animation: fadein 0.25s ease;
+}
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ia-modelo-row > label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 800;
   color: #ffd54f;
-  text-shadow: 0 2px 6px rgba(0,0,0,0.6);
-  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 6px;
 }
+.ia-modelo-row > label i { margin-right: 6px; opacity: 0.85; }
+.ia-modelo-select {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(15, 26, 42, 0.85);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 8px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.92rem;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%23ffd54f'><path d='M7 10l5 5 5-5z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+.ia-modelo-select:hover { border-color: rgba(255,213,79,0.5); }
+.ia-modelo-select:focus { outline: none; border-color: #ffd54f; }
+.ia-modelo-estado {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.74rem;
+  color: rgba(255,255,255,0.6);
+  min-height: 16px;
+}
+.ia-modelo-estado.error  { color: #ef9a9a; }
+.ia-modelo-estado.ok     { color: #a5d6a7; }
+
 .reporte-ia-cargando {
   margin-top: 12px;
   padding: 10px 14px;
@@ -1923,44 +2015,87 @@ label { font-size: 1rem; opacity: 0.85; }
 
 .docente-titulo-header {
   font-family: 'Fredoka One', cursive;
-  font-size: 1.15rem;
-  color: var(--dorado);
+  font-size: 1.35rem;
+  color: #ffd54f;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  letter-spacing: 0.5px;
+}
+.docente-titulo-header i {
+  font-size: 1.15rem;
+  opacity: 0.85;
+}
+
+#screen-docente-panel {
+  /* Capa de oscurecido sutil sobre el fondo para que las cards resalten */
+  background: linear-gradient(180deg,
+              rgba(6, 14, 26, 0.55) 0%,
+              rgba(6, 14, 26, 0.78) 100%);
+}
+#screen-docente-panel .ia-badge {
+  font-size: 0.78rem;
+  padding: 6px 14px;
+  letter-spacing: 0.3px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+#screen-docente-panel #btn-docente-salir {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  backdrop-filter: blur(6px);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+#screen-docente-panel #btn-docente-salir:hover {
+  background: rgba(255, 213, 79, 0.18);
+  border-color: rgba(255, 213, 79, 0.45);
 }
 
 .docente-panel-body {
-  padding: 1rem;
+  padding: 1.5rem 1rem 3.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  max-width: 700px;
+  gap: 1.2rem;
+  max-width: 760px;
   margin: 0 auto;
-  padding-bottom: 3rem;
   width: 100%;
   box-sizing: border-box;
 }
 
 .docente-card {
-  padding: 1.2rem;
+  background: rgba(15, 26, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  padding: 1.4rem 1.5rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .docente-card-titulo {
   font-family: 'Fredoka One', cursive;
-  font-size: 1.05rem;
-  color: var(--dorado);
-  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+  color: #ffd54f;
+  margin-bottom: 0.6rem;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  letter-spacing: 0.3px;
+}
+.docente-card-titulo i {
+  font-size: 1rem;
+  opacity: 0.85;
 }
 
 .docente-card-desc {
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: 0.8rem;
-  line-height: 1.5;
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.62);
+  margin-bottom: 1rem;
+  line-height: 1.55;
 }
 
 /* Lista de estudiantes */
@@ -1975,15 +2110,18 @@ label { font-size: 1rem; opacity: 0.85; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
-  padding: 0.7rem 1rem;
+  padding: 0.85rem 1.1rem;
   gap: 1rem;
-  transition: background 0.2s;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
 .estudiante-row:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 213, 79, 0.08);
+  border-color: rgba(255, 213, 79, 0.25);
+  transform: translateX(2px);
 }
 
 .estudiante-info {
@@ -2008,10 +2146,11 @@ label { font-size: 1rem; opacity: 0.85; }
 
 /* Caja de reporte */
 .docente-reporte-box {
-  margin-top: 0.8rem;
-  background: rgba(0, 0, 0, 0.25);
+  margin-top: 1rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
-  padding: 1rem;
+  padding: 1.1rem 1.2rem;
   min-height: 60px;
 }
 

@@ -159,7 +159,129 @@ async function mostrarModalProgreso(estudiante, progreso) {
   });
 }
 
+// ── Preferencia global: IA encendida/apagada ───────────────────────────────
+function leerPrefIA() {
+  try { return localStorage.getItem('pacifico_ia_on') === '1'; } catch(e) { return false; }
+}
+function guardarPrefIA(activa) {
+  try { localStorage.setItem('pacifico_ia_on', activa ? '1' : '0'); } catch(e) {}
+}
+function _ajustarTextoToggleIA(activa) {
+  const desc = document.getElementById('ia-toggle-desc');
+  if (!desc) return;
+  desc.textContent = activa
+    ? 'Encendida · Historias y respuestas generadas por Ollama (más variedad, más lento)'
+    : 'Apagada · Historias y chat predefinidos (rápido, sin internet)';
+}
+function initToggleIA() {
+  const chk = document.getElementById('ia-toggle-input');
+  if (!chk) return;
+  chk.checked = leerPrefIA();
+  _ajustarTextoToggleIA(chk.checked);
+  _ajustarVisibilidadSelectorModelo(chk.checked);
+  chk.addEventListener('change', () => {
+    guardarPrefIA(chk.checked);
+    _ajustarTextoToggleIA(chk.checked);
+    _ajustarVisibilidadSelectorModelo(chk.checked);
+    // Avisar al servidor de la nueva preferencia
+    api('POST', '/api/configuracion/ia', { activa: chk.checked }).catch(() => {});
+  });
+  // Sincronizar al servidor al iniciar
+  api('POST', '/api/configuracion/ia', { activa: chk.checked }).catch(() => {});
+
+  // Selector de modelo
+  initSelectorModeloIA();
+}
+
+function _ajustarVisibilidadSelectorModelo(iaActiva) {
+  const row = document.getElementById('ia-modelo-row');
+  if (!row) return;
+  row.classList.toggle('hidden', !iaActiva);
+}
+
+async function initSelectorModeloIA() {
+  const select = document.getElementById('ia-modelo-select');
+  const estado = document.getElementById('ia-modelo-estado');
+  if (!select) return;
+
+  // Cargar lista de modelos disponibles
+  try {
+    const data = await api('GET', '/api/ia/modelos');
+    if (!data.ollama_ok || !data.modelos || !data.modelos.length) {
+      select.innerHTML = '<option value="">Ollama no está corriendo</option>';
+      select.disabled = true;
+      if (estado) {
+        estado.textContent = '⚠️ No se detecta Ollama. Inicialo con: ollama serve';
+        estado.className = 'ia-modelo-estado error';
+      }
+      return;
+    }
+    select.innerHTML = '';
+    // Recuperar modelo preferido del localStorage si existe
+    let preferido = '';
+    try { preferido = localStorage.getItem('pacifico_ia_modelo') || ''; } catch(e) {}
+    const activo = preferido || data.activo;
+    data.modelos.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m + (m === data.activo ? '  (activo)' : '');
+      if (m === activo) opt.selected = true;
+      select.appendChild(opt);
+    });
+    if (estado) {
+      estado.textContent = `${data.modelos.length} modelo(s) disponible(s) · activo: ${data.activo}`;
+      estado.className = 'ia-modelo-estado ok';
+    }
+    // Si el modelo preferido no coincide con el activo del servidor, cambiarlo silenciosamente
+    if (preferido && preferido !== data.activo && data.modelos.includes(preferido)) {
+      _aplicarCambioModelo(preferido, estado);
+    }
+  } catch(e) {
+    select.innerHTML = '<option value="">Error de red</option>';
+    select.disabled = true;
+    if (estado) { estado.textContent = '⚠️ Error consultando modelos.'; estado.className = 'ia-modelo-estado error'; }
+    return;
+  }
+
+  // Listener de cambio
+  select.addEventListener('change', () => {
+    const nuevo = select.value;
+    if (!nuevo) return;
+    try { localStorage.setItem('pacifico_ia_modelo', nuevo); } catch(e) {}
+    _aplicarCambioModelo(nuevo, estado);
+  });
+}
+
+async function _aplicarCambioModelo(modelo, estadoEl) {
+  if (estadoEl) {
+    estadoEl.textContent = `Cambiando a ${modelo}…`;
+    estadoEl.className = 'ia-modelo-estado';
+  }
+  try {
+    const res = await fetch('/api/ia/modelo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ modelo }),
+    });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      if (estadoEl) {
+        estadoEl.textContent = `✅ Modelo activo: ${data.modelo}`;
+        estadoEl.className = 'ia-modelo-estado ok';
+      }
+    } else {
+      if (estadoEl) {
+        estadoEl.textContent = `⚠️ ${data.error || 'No se pudo cambiar el modelo.'}`;
+        estadoEl.className = 'ia-modelo-estado error';
+      }
+    }
+  } catch(e) {
+    if (estadoEl) { estadoEl.textContent = '⚠️ Error de red al cambiar modelo.'; estadoEl.className = 'ia-modelo-estado error'; }
+  }
+}
+
 function initIntro() {
+  initToggleIA();
   const guardado = localStorage.getItem('pacifico_estado_v2');
   if (guardado) {
     try {
@@ -256,6 +378,34 @@ function mostrarMenu() {
   // Así, cuando el estudiante elige una materia y luego un nivel, la historia
   // del nivel 1 ya está lista. Los demás niveles se precargan al entrar al selector.
   _precargarNivel1DeCadaMateria();
+  // Precarga de imágenes pesadas (backgrounds de selector + explicaciones de misión)
+  _precargarImagenesPesadas();
+}
+
+// Pone en caché del navegador todas las imágenes grandes que se van a usar
+// en las próximas pantallas, para que al cambiar de vista aparezcan instantáneas.
+function _precargarImagenesPesadas() {
+  const urls = [
+    // Backgrounds de selectores de niveles
+    '/static/images/backgrounds/nivelesMatematicas.png',
+    '/static/images/backgrounds/nivelesLenguaje.png',
+    '/static/images/backgrounds/nivelesIngles.png',
+    '/static/images/backgrounds/nivelesBiologia.png',
+    // Imágenes explicativas de misión
+    '/static/images/level_matematicas/explicaNiv2-5Mat.png',
+    '/static/images/level_lenguaje/explicaNivLen.png',
+    '/static/images/level_ingles/explicaNivIng.png',
+    '/static/images/level_biologia/explicaNivBio.png',
+    // Nodos de nivel de matemáticas
+    '/static/images/level_matematicas/level1Mat.png',
+    '/static/images/level_matematicas/level2Mat.png',
+    '/static/images/level_matematicas/level3Mat.png',
+    '/static/images/level_matematicas/level4Mat.png',
+    '/static/images/level_matematicas/level5Mat.png',
+    // Personaje
+    '/static/images/level_matematicas/riviel.png',
+  ];
+  urls.forEach(u => { const img = new Image(); img.src = u; });
 }
 
 // Precarga solo el nivel 1 de cada materia (4 historias en background, secuencial)
