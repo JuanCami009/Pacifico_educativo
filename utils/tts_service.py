@@ -172,6 +172,22 @@ def _generar_edge_tts(texto: str, ruta_mp3: str) -> bool:
 # API publica
 # ---------------------------------------------------------------------------
 
+def url_si_cacheada(texto: str) -> str | None:
+    """
+    Devuelve la URL del audio SOLO si ya esta en cache (sin generar nada).
+    Chequeo instantaneo de archivo. Util para responder rapido y diferir
+    la generacion del audio a una peticion aparte.
+    """
+    clave    = _clave(texto)
+    ruta_mp3 = os.path.join(CACHE_DIR, f'{clave}.mp3')
+    ruta_wav = os.path.join(CACHE_DIR, f'{clave}.wav')
+    if os.path.exists(ruta_mp3) and os.path.getsize(ruta_mp3) > 100:
+        return f'{CACHE_URL}/{clave}.mp3'
+    if os.path.exists(ruta_wav) and os.path.getsize(ruta_wav) > 100:
+        return f'{CACHE_URL}/{clave}.wav'
+    return None
+
+
 def generar_audio(texto: str) -> str | None:
     """
     Genera (o devuelve del cache) la URL publica del audio para el texto dado.

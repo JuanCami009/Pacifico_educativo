@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from flask import Flask, jsonify, request, render_template
 from utils.ollama_service import servicio_ia
-from utils.tts_service import generar_audio as tts_generar
+from utils.tts_service import generar_audio as tts_generar, url_si_cacheada as tts_cacheada
 from data.ia_fallback import MATERIA_A_PERSONAJE
 from utils.database import (
     inicializar_base_de_datos,
@@ -372,15 +372,28 @@ def ia_historia_nivel():
         contexto_nivel_info = contexto_nivel,
     )
 
-    # Generar audio TTS offline y adjuntar la URL al resultado
+    # NO generar audio aqui (bloquearia la respuesta ~1-2s). Solo adjuntar la URL
+    # si el audio YA esta en cache (chequeo instantaneo). El cliente pide el audio
+    # aparte via /api/ia/tts cuando lo necesita. Asi el texto aparece al instante.
     historia_texto = resultado.get("historia") or resultado.get("respuesta") or ""
-    if historia_texto:
-        audio_url = tts_generar(historia_texto)
-        resultado["audioUrl"] = audio_url  # None si falla; el cliente lo ignora
-    else:
-        resultado["audioUrl"] = None
+    resultado["audioUrl"] = tts_cacheada(historia_texto) if historia_texto else None
 
     return jsonify(resultado)
+
+
+@app.route("/api/ia/tts", methods=["POST"])
+def ia_tts():
+    """
+    Genera (o devuelve del cache) el audio TTS para un texto dado.
+    Se llama por separado para no bloquear la carga del texto de la historia.
+    Body: {texto: "..."}.  Respuesta: {audioUrl: "/static/..." | null}.
+    """
+    datos = request.get_json(silent=True) or {}
+    texto = (datos.get("texto") or "").strip()
+    if not texto:
+        return jsonify({"audioUrl": None, "error": "texto vacio"}), 400
+    audio_url = tts_generar(texto)
+    return jsonify({"audioUrl": audio_url})
 
 
 @app.route("/api/ia/retroalimentacion", methods=["POST"])
@@ -517,22 +530,25 @@ def ia_cambiar_modelo():
 @app.route("/api/configuracion/ia", methods=["POST", "GET"])
 def configurar_ia():
     """
-    Toggle global. El frontend lo manda al iniciar y al cambiar el switch.
-    Si esta apagada, TODOS los endpoints de IA usan SIEMPRE los textos curados
-    (sin llamar a Ollama). Util para Vercel/serverless o ninos sin internet.
+    Toggle global de IA. El frontend lo manda al iniciar y al cambiar el switch.
 
-    Funciona seteando IA_GLOBAL_OFF en el entorno del proceso — el servicio_ia
-    revisa esa variable en cada verificar_disponibilidad().
+    IMPORTANTE: el toggle controla el CHAT, las PISTAS y los REPORTES del docente.
+    Las HISTORIAS de nivel SIEMPRE usan los textos curados (escritos a mano),
+    porque los modelos locales pequenos producen historias confusas, truncadas
+    y poco apropiadas para ninos. Las curadas son instantaneas y claras.
+
+    Si quieres experimentar con historias por IA (necesita un modelo grande tipo
+    llama3.2:3b), arranca el server con la variable OLLAMA_HISTORIAS=1.
     """
     if request.method == "POST":
         datos = request.get_json(silent=True) or {}
         IA_ACTIVA["valor"] = bool(datos.get("activa", False))
         if IA_ACTIVA["valor"]:
             os.environ.pop("IA_GLOBAL_OFF", None)
-            os.environ["OLLAMA_HISTORIAS"] = "1"
         else:
             os.environ["IA_GLOBAL_OFF"] = "1"
-            os.environ["OLLAMA_HISTORIAS"] = "0"
+        # NOTA: ya no tocamos OLLAMA_HISTORIAS aqui. Las historias quedan curadas
+        # salvo que el usuario lo fuerce manualmente con la variable de entorno.
     return jsonify({"activa": IA_ACTIVA["valor"]})
 
 

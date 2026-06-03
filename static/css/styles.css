@@ -2255,17 +2255,20 @@ label { font-size: 1rem; opacity: 0.85; }
   position: absolute;
   left: 26%;
   right: 31%;
-  top: 27%;
-  bottom: 34%;
+  top: 26%;
+  bottom: 31%;
   z-index: 2;
   display: flex;
   align-items: flex-start;
-  padding: 18px 28px 10px;
-  overflow: hidden;
+  padding: 14px 26px 8px;
+  /* scroll interno invisible si la historia es muy larga (no se recorta) */
+  overflow-y: auto;
+  scrollbar-width: none;
   /* flex-wrap para que el botón TTS quede a la derecha */
   flex-wrap: wrap;
   gap: 8px;
 }
+.mision-texto-overlay::-webkit-scrollbar { display: none; }
 
 /* ── Botón TTS (Text-to-Speech) ── */
 .btn-tts-mision {
@@ -2308,9 +2311,9 @@ label { font-size: 1rem; opacity: 0.85; }
 .mision-historia-texto {
   color: #3d1f00;
   font-family: 'Nunito', sans-serif;
-  font-size: 1.25rem;
+  font-size: 1.12rem;
   font-weight: 800;
-  line-height: 1.7;
+  line-height: 1.55;
   width: 100%;
 }
 .mision-loading {

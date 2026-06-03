@@ -170,8 +170,8 @@ function _ajustarTextoToggleIA(activa) {
   const desc = document.getElementById('ia-toggle-desc');
   if (!desc) return;
   desc.textContent = activa
-    ? 'Encendida · Historias y respuestas generadas por Ollama (más variedad, más lento)'
-    : 'Apagada · Historias y chat predefinidos (rápido, sin internet)';
+    ? 'Encendida · Chat y reportes con Ollama. Las historias siguen siendo las predefinidas.'
+    : 'Apagada · Todo predefinido (rápido, sin internet). Ideal sin conexión.';
 }
 function initToggleIA() {
   const chk = document.getElementById('ia-toggle-input');
@@ -408,15 +408,17 @@ function _precargarImagenesPesadas() {
   urls.forEach(u => { const img = new Image(); img.src = u; });
 }
 
-// Precarga solo el nivel 1 de cada materia (4 historias en background, secuencial)
+// Precarga solo el nivel 1 de cada materia (texto rápido + audio en background)
 async function _precargarNivel1DeCadaMateria() {
   const materias = MATERIAS.map(m => m.clave);
   for (const mat of materias) {
     const k = `${mat}-1`;
     if (_historiaCache.has(k)) continue;
     _historiaCache.set(k, 'loading');
-    await _precargarHistoria(mat, 1, k);
+    await _precargarTexto(mat, 1, k);
   }
+  // Calentar audios del nivel 1 en background
+  for (const mat of materias) _calentarAudioNivel(`${mat}-1`);
 }
 
 // Función global accesible desde el onclick inline (más confiable que addEventListener)
@@ -600,12 +602,12 @@ async function mostrarMision(nivel) {
   }
 
   if (cached && cached !== 'loading' && cached.historia) {
-    // ✅ Cache hit: usar datos precargados
+    // ✅ Cache hit: el texto aparece de inmediato
     Estado.nivelDatos = cached.datos || Estado.nivelDatos;
     textoEl.innerHTML = '';
     await _escribirTexto(textoEl, cached.historia);
-    _ttsGuardarAudio(cached.audioUrl);
-    _ttsMostrarBtn();
+    // El audio se carga aparte (no bloquea el texto)
+    _prepararAudioMision(cached.historia, cached.audioUrl, cacheKey);
     return;
   }
 
@@ -622,17 +624,59 @@ async function mostrarMision(nivel) {
       minijuego:    datos.minijuego || '',
     });
     const historia = res.historia || res.respuesta || datos.frase_intro || '¡Adelante, aventurero!';
-    // Guardar en caché para futuras visitas
+    // Guardar texto en caché de inmediato
     _historiaCache.set(cacheKey, { historia, audioUrl: res.audioUrl || null, datos });
     textoEl.innerHTML = '';
     await _escribirTexto(textoEl, historia);
-    _ttsGuardarAudio(res.audioUrl || null);
-    _ttsMostrarBtn();
+    // Cargar audio aparte (no bloquea el texto)
+    _prepararAudioMision(historia, res.audioUrl, cacheKey);
   } catch (_) {
     const datos = Estado.nivelDatos || {};
     const fallback = datos.frase_intro || '¡Adelante, aventurero del Pacífico!';
     textoEl.textContent = fallback;
     _ttsOcultarBtn();
+  }
+}
+
+/**
+ * Prepara el audio de la misión SIN bloquear el texto.
+ * Si ya hay URL cacheada la usa; si no, la pide al servidor mostrando el botón
+ * en estado "cargando" y lo habilita cuando el audio esté listo.
+ */
+async function _prepararAudioMision(texto, audioUrlCacheado, cacheKey) {
+  _ttsAudioUrl = null;
+  const btn = document.getElementById('btn-tts-mision');
+
+  if (audioUrlCacheado) {
+    _ttsAudioUrl = audioUrlCacheado;
+    _ttsMostrarBtn();
+    return;
+  }
+
+  // Mostrar botón en estado "cargando audio…"
+  if (btn) {
+    btn.classList.remove('hidden', 'tts-hablando');
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    btn.setAttribute('disabled', 'disabled');
+    btn.title = 'Preparando audio…';
+  }
+
+  try {
+    const res = await api('POST', '/api/ia/tts', { texto });
+    if (res && res.audioUrl) {
+      _ttsAudioUrl = res.audioUrl;
+      // Actualizar la entrada de caché para que la próxima vez sea instantánea
+      if (cacheKey) {
+        const entry = _historiaCache.get(cacheKey);
+        if (entry && typeof entry === 'object') { entry.audioUrl = res.audioUrl; _historiaCache.set(cacheKey, entry); }
+      }
+      if (btn) { btn.removeAttribute('disabled'); btn.title = 'Escuchar historia'; }
+      _ttsMostrarBtn();
+    } else {
+      if (btn) btn.classList.add('hidden');
+    }
+  } catch (_) {
+    if (btn) btn.classList.add('hidden');
   }
 }
 
@@ -674,16 +718,22 @@ async function mostrarPersonaje(nivel) { return mostrarMision(nivel); }
 const _historiaCache = new Map(); // clave: `${materia}-${nivel}` → {historia, audioUrl, datos} | 'loading'
 
 async function _precargarHistorias(materia) {
-  // Secuencial: una a la vez para no saturar Ollama ni las conexiones del navegador
+  // FASE 1: precargar TODOS los textos primero (rápido, curado). Así cualquier
+  // nivel que el usuario toque ya tiene su texto listo de inmediato.
   for (let nivel = 1; nivel <= 5; nivel++) {
     const k = `${materia}-${nivel}`;
     if (_historiaCache.has(k)) continue; // ya en caché o cargando
     _historiaCache.set(k, 'loading');
-    await _precargarHistoria(materia, nivel, k);   // esperar que termine antes de la siguiente
+    await _precargarTexto(materia, nivel, k);
+  }
+  // FASE 2: calentar los audios en background (sin bloquear). Cuando termina,
+  // el botón de audio del nivel ya estará instantáneo.
+  for (let nivel = 1; nivel <= 5; nivel++) {
+    _calentarAudioNivel(`${materia}-${nivel}`);
   }
 }
 
-async function _precargarHistoria(materia, nivel, cacheKey) {
+async function _precargarTexto(materia, nivel, cacheKey) {
   try {
     const datos = await api('GET', `/api/niveles/${materia}/${nivel}`);
     const per   = PERSONAJES[materia] || {};
@@ -694,16 +744,33 @@ async function _precargarHistoria(materia, nivel, cacheKey) {
       nombre_nivel: NOMBRES_NIVEL[nivel - 1] || '',
       minijuego:    datos.minijuego || '',
     });
-    _historiaCache.set(cacheKey, {
-      historia: res.historia || res.respuesta || datos.frase_intro || '',
-      audioUrl: res.audioUrl || null,
-      datos,
-    });
-    console.log(`[Precarga] Listo: ${cacheKey}`);
+    const historia = res.historia || res.respuesta || datos.frase_intro || '';
+    _historiaCache.set(cacheKey, { historia, audioUrl: res.audioUrl || null, datos });
+    console.log(`[Precarga] Texto listo: ${cacheKey}`);
   } catch (e) {
     _historiaCache.delete(cacheKey); // permitir reintento
     console.warn(`[Precarga] Error: ${cacheKey}`, e);
   }
+}
+
+// Cola simple para no disparar 5 generaciones de audio a la vez
+let _colaAudioPromise = Promise.resolve();
+function _calentarAudioNivel(cacheKey) {
+  const entry = _historiaCache.get(cacheKey);
+  if (!entry || typeof entry !== 'object' || !entry.historia || entry.audioUrl) return;
+  // Encadenar para que los audios se generen de uno en uno
+  _colaAudioPromise = _colaAudioPromise.then(async () => {
+    const e = _historiaCache.get(cacheKey);
+    if (!e || typeof e !== 'object' || !e.historia || e.audioUrl) return;
+    try {
+      const tts = await api('POST', '/api/ia/tts', { texto: e.historia });
+      if (tts && tts.audioUrl) {
+        e.audioUrl = tts.audioUrl;
+        _historiaCache.set(cacheKey, e);
+        console.log(`[Precarga] Audio listo: ${cacheKey}`);
+      }
+    } catch (_) { /* se generará bajo demanda */ }
+  });
 }
 
 // ── TTS offline usando elemento <audio> (el audio lo genera el servidor) ─────

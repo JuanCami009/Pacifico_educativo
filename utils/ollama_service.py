@@ -535,18 +535,17 @@ class ServicioIA:
                 personaje=personaje,
                 mensaje=prompt,
                 system_prompt_override=system,
-                max_tokens=120,
+                max_tokens=220,          # suficiente para no truncar a media frase
                 normalizar=False,
             )
             if respuesta:
-                respuesta = _limpiar_markdown(respuesta)
-                partes = _separar_oraciones(respuesta)
-                historia = " ".join(partes[:3])
-                # Si el texto sigue siendo confuso (muy largo o con palabras prohibidas),
-                # caer al fallback curado
-                if (len(historia) > 60 and len(historia) < 380
-                        and "lament" not in historia.lower()
-                        and "niño" not in historia.lower()):
+                historia = _limpiar_historia_ia(respuesta)
+                # Validacion estricta: si sigue confusa/truncada, usar curado
+                low = historia.lower()
+                malo = any(p in low for p in ("lament", "niño", "niña", "pecado", "no tengo", "necesito"))
+                # Truncada = no termina en signo de cierre de oracion
+                truncada = bool(historia) and historia[-1] not in ".!?…"
+                if historia and 50 < len(historia) < 400 and not malo and not truncada:
                     return {
                         "historia": historia,
                         "fuente":   "ollama",
@@ -575,106 +574,96 @@ class ServicioIA:
         """
         import random as _rand
         historias = {
-            # ── MATEMÁTICAS ────────────────────────────────────────────
+            # ── MATEMÁTICAS (El Riviel) ────────────────────────────────
             "matematicas": {
                 1: [
-                    "¡Hola! Soy El Riviel, espíritu del río. Mira: los cangrejos salieron a pasear por el muelle y necesito tu ayuda. Atrapa SOLO los cangrejos que tengan el número que yo te diga. ¡Tócalos rápido antes de que se metan al agua!",
-                    "El sol salió sobre el manglar y los cangrejitos corren por la arena. Tu misión: tocar únicamente los cangrejos que tengan el número correcto. ¡Sé rápido, valiente!",
-                    "¡Qué bueno verte! Los cangrejos están jugando carreras en la orilla. Yo te diré un número y tú debes tocar SOLO los cangrejos que lo lleven encima. ¡Ánimo, tú puedes!",
+                    "¡Epa! Soy El Riviel, el espíritu travieso del río Atrato. Esta mañana los cangrejos se escaparon de mi canasta y andan corriendo por todo el muelle como locos, ¡moviendo sus tenazas y echándome agua! Necesito que me ayudes a recogerlos antes de que se metan al manglar. En este nivel yo te diré un número, y tú tienes que tocar solo los cangrejos que lleven ese número encima. ¡Rápido, que son veloces!",
+                    "Ay, qué alegría verte por la orilla. Anoche soñé que un montón de cangrejitos salían del río cargando números pintados en el caparazón, ¡y al despertar era verdad! Andan paseando por el muelle muy orgullosos. En este nivel tu trabajo es sencillo pero divertido: yo digo un número y tú tocas únicamente los cangrejos que tengan ese mismo número. ¡A entrenar el ojo, campeón!",
                 ],
                 2: [
-                    "Los pescadores volvieron con canoas llenas de peces brillantes. Cada canoa necesita una cantidad exacta de peces para no hundirse. Tu misión: arrastrar los grupos de peces a la canoa cuyo número coincida con la SUMA del grupo. ¡A pescar matemáticas!",
-                    "El muelle está lleno de peces saltarines y tres canoas esperan su carga. Suma los peces de cada grupo y arrástralos a la canoa que tenga el número correcto. ¡Tú eres el capitán hoy!",
-                    "¡Mira cuántos peces! Cada canoa tiene un número escrito. Suma los peces del grupo y llévalo a la canoa que tenga esa misma cantidad. ¡Tu cerebro pesca mejor que cualquier red!",
+                    "¡Llegaron las canoas! Los pescadores volvieron al amanecer con redes repletas de peces que brillan como monedas de plata. Pero hay un problema: cada canoa solo aguanta una cantidad exacta de peces o se hunde, ¡y nadie quiere nadar con los tiburones! En este nivel vas a sumar los peces de cada grupo y arrastrarlos a la canoa que tenga ese mismo número. Suma bien y mantén el barco a flote. ¡Eres el capitán!",
+                    "El muelle huele a mar y a aventura, y tres canoas se mecen esperando su carga de peces. Cada una tiene un número pintado en la madera. En este nivel tu misión es sumar cuántos peces hay en cada grupo y llevarlos a la canoa cuyo número coincida con esa suma. ¡Tu cabeza suma más rápido que cualquier red, ya verás!",
                 ],
                 3: [
-                    "La marea subió y se llevó algunos caracoles de la playa. Mira cuántos había al inicio, mira cuántos se llevó el agua, y dime cuántos quedaron. ¡Es una resta marina!",
-                    "Anoche las olas jugaron con los caracoles y se llevaron unos cuantos. Resta los que se fueron y descubre cuántos siguen brillando en la arena. ¡Cuenta con calma!",
-                    "El mar se llevó parte del tesoro de la playa. Observa cuántos caracoles había y cuántos faltan ahora — ¡la resta te dirá el resto! Tú decides el número final.",
+                    "Anoche la marea subió altísima y jugó toda la noche con los caracoles de la playa, llevándose unos cuantos mar adentro entre risas de espuma. ¡Qué traviesa es el agua! Esta mañana quedaron menos. En este nivel vas a mirar cuántos caracoles había, cuántos se llevó la marea, y restar para decirme cuántos quedaron en la arena. ¡Tú tienes el ojo del buen contador!",
+                    "El mar es un ladronzuelo simpático: cada noche se lleva prestados algunos caracoles y los devuelve cuando quiere. Hoy se llevó varios de la orilla. En este nivel observa cuántos caracoles había al principio, fíjate cuántos desaparecieron con las olas, y resta para encontrar cuántos siguen brillando en la playa. ¡A restar como todo un explorador!",
                 ],
                 4: [
-                    "El fondo del río esconde cofres cubiertos de conchas brillantes. Cada cofre tiene un número. Yo te diré la multiplicación y tú debes tocar SOLO el cofre cuyo número sea la respuesta correcta. ¡Multiplica como un maestro!",
-                    "¡Tesoros! Los cofres del manglar tienen números pintados. Calcula la multiplicación que te pido y toca el cofre con el resultado exacto. ¡El oro del Pacífico será tuyo!",
-                    "Bajo el agua descansan cofres llenos de conchas. Cada uno tiene un número. Resuelve la multiplicación en tu mente y toca el cofre correcto. ¡Demuestra que sabes multiplicar!",
+                    "¡Shhh, acércate! En el fondo del río descansan cofres antiguos cubiertos de conchas de mil colores, y dicen que guardan el tesoro de los abuelos pescadores. Pero solo se abren con la respuesta correcta. En este nivel yo te diré una multiplicación, y tú debes tocar únicamente el cofre cuyo número sea el resultado exacto. Multiplica con calma y el oro del Pacífico será tuyo. ¡Vamos, valiente buzo!",
+                    "El arrecife esconde un secreto brillante: cofres llenos de conchas, cada uno marcado con un número. Solo el que sabe multiplicar puede elegir el correcto. En este nivel resuelve en tu mente la multiplicación que te pido y toca el cofre con el resultado exacto. ¡Demuestra que llevas un matemático adentro!",
                 ],
                 5: [
-                    "El día de pesca fue increíble y todo el pueblo espera su parte. Tu trabajo: arrastrar los peces a las canastas para que CADA familia reciba la misma cantidad. ¡La división es repartir parejo!",
-                    "¡Hay tantos peces! Reparte los peces en partes iguales entre las canastas. Cuando todas tengan lo mismo, el pueblo te aplaudirá. ¡Divide con justicia!",
-                    "Las canastas vacías esperan los peces. Cuenta cuántos peces hay y repártelos parejo entre todas las canastas. ¡En el Pacífico, lo justo es compartir!",
+                    "¡Qué día de pesca tan bueno! Las redes salieron tan llenas que todo el pueblo del manglar se reunió en la orilla para celebrar. Pero ahora viene lo importante: hay que repartir los peces para que cada familia reciba lo justo, ni más ni menos. En este nivel vas a arrastrar los peces a las canastas para que todas queden con la misma cantidad. ¡La división es compartir parejo, y en el Pacífico nadie se queda con hambre!",
+                    "El río fue generoso hoy y regaló más peces de los que cabían en las canastas. Ahora todo el pueblo espera su parte con una sonrisa. En este nivel tu misión es repartir los peces en partes iguales entre todas las canastas, sin que ninguna tenga de más. ¡Divide con justicia y serás el héroe de la fiesta!",
                 ],
             },
-            # ── LENGUAJE ───────────────────────────────────────────────
+            # ── LENGUAJE (La Tunda) ────────────────────────────────────
             "lenguaje": {
                 1: [
-                    "¡Hola! Soy La Tunda, guardiana de las palabras. Te muestro una letra y tú debes tocar TODAS las imágenes cuyo nombre empiece con esa letra. ¡Escucha con los ojos!",
-                    "Los animales del manglar quieren jugar contigo. Mira la letra que te enseño y toca solo los dibujos cuyo nombre comience con esa letra. ¡Es como un tesoro de sonidos!",
-                    "La selva está llena de palabras escondidas. Yo te doy una letra y tú encuentras los dibujos que empiecen así. ¡Tus oídos y tus ojos son tu mejor herramienta!",
+                    "¡Hola, hola! Soy La Tunda, la guardiana de las palabras de la selva. Esta mañana el viento sopló tan fuerte que revolvió todos los sonidos del bosque, ¡y ahora las letras andan jugando a las escondidas entre los dibujos! Necesito tu oído fino. En este nivel yo te mostraré una letra, y tú debes tocar todas las imágenes cuyo nombre empiece con ese sonido. ¡Escucha con los ojos, pequeño explorador!",
+                    "La selva amaneció cantando: los pájaros silban, las ranas croan y hasta el río murmura palabras. Entre tanto sonido se escondieron unas letras juguetonas. En este nivel te enseñaré una letra y tú tendrás que encontrar y tocar los dibujos cuyo nombre comience con ella. ¡Es como una cacería de sonidos por todo el manglar!",
                 ],
                 2: [
-                    "Las palabras viajan en pedacitos por el río y se llaman sílabas. Tu tarea: arrastrar cada sílaba a su lugar correcto para formar la palabra completa. ¡Tú eres el constructor de palabras!",
-                    "Una palabra mágica se rompió en sílabas. Arrástralas en el orden correcto y la palabra cobrará vida. ¡Vamos, sílaba por sílaba!",
-                    "Las sílabas están desordenadas como peces nadando sueltos. Ponlas en su sitio una por una y formarás la palabra correcta. ¡La selva esperará tu canción!",
+                    "¡Ay, qué desorden! Las mariposas del bosque pasaron volando y se robaron las sílabas de mis palabras, dejándolas todas en pedacitos regados por el suelo. Una palabra rota no puede cantar. En este nivel tu misión es arrastrar cada sílaba a su lugar correcto, en orden, hasta armar la palabra completa. ¡Tú eres el constructor de palabras de la selva!",
+                    "Las palabras del manglar viajan en pedacitos llamados sílabas, y hoy una palabra muy importante se desarmó en la corriente del río. Si no la armamos, la selva se quedará callada. En este nivel vas a unir las sílabas en el orden correcto, arrastrándolas una por una, para que la palabra vuelva a tener sentido. ¡Sílaba por sílaba lo lograrás!",
                 ],
                 3: [
-                    "Un animal del bosque perdió una sílaba de su nombre. Mira las opciones, elige la sílaba correcta y arrástrala al hueco para completar su nombre. ¡Él te lo agradecerá!",
-                    "La palabra le falta un pedacito. Tu trabajo: encontrar la sílaba que falta y arrastrarla al espacio vacío. ¡Cuando esté completa, la selva sonreirá!",
-                    "¡Mira la palabra incompleta! Una sílaba se perdió. Búscala entre las opciones y ponla en su lugar para que la palabra sea perfecta.",
+                    "Pobrecito el animalito del bosque: una tormenta se llevó un pedacito de su nombre y ahora nadie sabe cómo llamarlo, ¡anda triste y perdido entre los árboles! Tú puedes devolverle su nombre. En este nivel mira la palabra incompleta, busca entre las opciones la sílaba que falta, y arrástrala al hueco para completarla. ¡Él te lo agradecerá con un canto!",
+                    "El viento travieso se llevó una sílaba de cada palabra y dejó huecos por toda la selva, como dientes que faltan en una sonrisa. En este nivel tu trabajo es encontrar la sílaba exacta que completa cada palabra y ponerla en su lugar. ¡Cuando la palabra esté entera, el bosque volverá a cantar feliz!",
                 ],
                 4: [
-                    "Las palabras de una oración están todas revueltas. Tu misión: ordenarlas correctamente arrastrándolas para formar una oración que tenga sentido. ¡Ponlas en su sitio!",
-                    "Una historia bonita se mezcló por el viento. Arrastra las palabras en el orden correcto y formarás una oración hermosa. ¡Tú eres el escritor del Pacífico!",
-                    "Las palabras flotan sin orden como hojas en el río. Acomódalas correctamente para construir la oración. ¡Solo tú puedes hacer que tenga sentido!",
+                    "¡Qué lío armó el remolino del río! Tomó una oración bien bonita sobre el Pacífico y la sacudió hasta dejar todas las palabras revueltas, flotando sin orden como hojas en el agua. En este nivel tu misión es arrastrar las palabras y acomodarlas en el orden correcto para que la oración tenga sentido otra vez. ¡Tú eres el narrador que pone todo en su sitio!",
+                    "Las palabras de una historia preciosa se mezclaron cuando la brisa pasó corriendo por el manglar, y ahora la frase no se entiende ni un poquito. En este nivel vas a ordenar las palabras, una tras otra, hasta formar una oración que suene bonita y tenga sentido. ¡Solo un buen escritor del Pacífico como tú puede lograrlo!",
                 ],
                 5: [
-                    "Yo te digo una palabra y tú tocas la imagen que corresponde. ¡Vamos a descubrir cuántas palabras conoces!",
-                    "Te muestro varias imágenes y te digo una palabra. Toca la imagen correcta y demostrarás tu vocabulario del Pacífico. ¡A ver qué tan listo eres!",
-                    "Mira bien las imágenes. Yo digo una palabra y tú encuentras a qué dibujo corresponde. ¡Cada acierto suma al gran libro de tus palabras!",
+                    "El Duende del bosque escondió palabras mágicas detrás de los dibujos del manglar, ¡y le encanta retar a los más curiosos! ¿Aceptas el reto? En este nivel yo te diré una palabra y tú deberás tocar la imagen que le corresponde. Cada acierto agranda el gran libro de palabras que llevas en la cabeza. ¡A demostrar cuánto vocabulario tienes!",
+                    "Cada criatura y cada cosa del Pacífico tiene un nombre que guarda su historia, y hoy vamos a jugar a reconocerlos. En este nivel te diré una palabra y tú tocarás el dibujo correcto entre varios. ¡Mientras más palabras reconozcas, más sabio te vuelves, explorador!",
                 ],
             },
-            # ── INGLÉS ─────────────────────────────────────────────────
+            # ── INGLÉS (El Duende) ─────────────────────────────────────
             "ingles": {
                 1: [
-                    "Hi! Soy El Duende y te voy a enseñar palabras en inglés. Te muestro una palabra como 'fish' o 'crab' y tú tocas la imagen correcta. ¡Aprender es divertido!",
-                    "¡Hello! Los animales del manglar tienen nombres en inglés. Toca la imagen que corresponde a la palabra que te digo. ¡Tú puedes hablar como un explorador!",
+                    "Hi! Soy El Duende, el más viajero de todo el Pacífico, ¡y traje palabras nuevas desde el otro lado del mar! En inglés, los animales del manglar tienen otros nombres muy divertidos: el pez es 'fish' y el cangrejo es 'crab'. En este nivel yo te diré una palabra en inglés y tú tocarás la imagen correcta. ¡Vas a hablar como un explorador del mundo entero!",
+                    "¡Hello, amigo! Me encanta viajar en canoa contando historias en dos idiomas. Hoy quiero enseñarte los nombres secretos de las cosas en inglés. En este nivel te mostraré una palabra en inglés y tú deberás tocar el dibujo que le corresponde. ¡Cada acierto te acerca a hablar como un verdadero aventurero internacional!",
                 ],
                 2: [
-                    "Los colores del Pacífico son hermosos. Yo te digo un color en inglés ('red', 'blue', 'green'...) y tú tocas el objeto que tenga ese color. ¡Pinta tu mundo en inglés!",
-                    "Mira los objetos de mil colores. Te digo el color en inglés y tú lo encuentras. ¡Cada acierto es una victoria, my friend!",
+                    "¡Mira qué colorido amaneció el manglar! Las flores, los peces y las canoas pintan el Pacífico de mil colores, y en inglés cada color tiene su nombre: 'red' es rojo, 'blue' es azul, 'green' es verde. En este nivel yo diré un color en inglés y tú tocarás el objeto que tenga ese color. ¡Pinta tu mundo en inglés, my friend!",
+                    "Los colores son la fiesta del Pacífico, y hoy aprenderemos a nombrarlos en inglés. En este nivel te diré un color en inglés y tú buscarás y tocarás el objeto que lo tenga. ¡Cada color que reconozcas es una pequeña victoria de campeón!",
                 ],
                 3: [
-                    "Los números también tienen nombre en inglés: 'one, two, three...'. Yo te digo un número en inglés y tú tocas el grupo de animales con esa cantidad. ¡Cuenta con valentía!",
-                    "¡A contar en inglés! Te digo 'four' y tú buscas el grupo de cuatro objetos. ¡La selva tiene mucho que enseñarte en inglés!",
+                    "¿Sabías que los números también hablan inglés? 'One, two, three...' suenan distinto pero cuentan lo mismo. Los animales del manglar quieren jugar a contarse contigo. En este nivel yo diré un número en inglés y tú tocarás el grupo de animales que tenga esa cantidad. ¡A contar en inglés con valentía!",
+                    "¡A jugar con los números en inglés! En el Pacífico hasta los pelícanos cuentan sus peces. En este nivel te diré un número en inglés, como 'four' o 'five', y tú buscarás el grupo que tenga esa cantidad exacta de cosas. ¡La selva tiene mucho que enseñarte en otro idioma!",
                 ],
                 4: [
-                    "Cada cosa tiene su lugar. Yo te muestro una palabra en inglés y tú arrastras el objeto a la categoría correcta (frutas, animales, colores...). ¡Organiza el mundo en inglés!",
-                    "Las palabras viven en grupos. Arrastra cada palabra al grupo al que pertenece (animals, colors, fruits). ¡Tú entiendes el idioma de la aventura!",
+                    "El Duende organizado tiene un baúl mágico con tres cajones: uno para animales, otro para colores y otro para frutas, ¡pero todo se mezcló! En este nivel yo te mostraré una palabra en inglés y tú la arrastrarás al grupo al que pertenece: 'animals', 'colors' o 'fruits'. ¡Ordena el mundo en inglés y serás mi ayudante favorito!",
+                    "Las palabras en inglés viven en familias: las frutas con las frutas, los animales con los animales. Hoy se nos revolvieron todas. En este nivel vas a arrastrar cada palabra en inglés al grupo correcto. ¡Tú entiendes el idioma de la gran aventura!",
                 ],
                 5: [
-                    "Frases cortas en inglés perdieron una palabra. Tú eliges la palabra correcta para completarla. ¡Forma frases como un verdadero pirata del Pacífico!",
-                    "Lee la frase incompleta en inglés y arrastra la palabra que falta. ¡Cuando la termines, podrás hablar con cualquier marinero del mundo!",
+                    "¡Casi eres todo un explorador bilingüe! Solo falta el reto final: unas frases cortas en inglés perdieron una palabra en el viento del mar. En este nivel vas a leer la frase incompleta y elegir la palabra correcta para terminarla. ¡Cuando lo logres, podrás conversar con cualquier marinero del mundo!",
+                    "El último tesoro del idioma son las frases completas. Algunas se quedaron sin una palabra y no se entienden bien. En este nivel tu misión es completar cada frase en inglés escogiendo la palabra que falta. ¡Forma frases como un verdadero capitán del Pacífico!",
                 ],
             },
-            # ── BIOLOGÍA ───────────────────────────────────────────────
+            # ── BIOLOGÍA (La Madre de Agua) ────────────────────────────
             "biologia": {
                 1: [
-                    "¡Hola! Soy La Madre de Agua. El manglar está lleno de seres vivos: peces, cangrejos, aves, plantas. Tu misión: tocar SOLO los seres vivos (no las piedras ni los objetos). ¡A descubrir la vida!",
-                    "El manglar respira. Mira a tu alrededor y toca los seres vivos que veas — pero ten cuidado, no todo lo que se mueve está vivo. ¡Aprende a observar!",
+                    "Soy La Madre de Agua, la que cuida cada gota y cada criatura del manglar. Mira a tu alrededor: hay peces que nadan, cangrejos que corren, aves que cantan y plantas que crecen... pero también piedras, canoas y conchas vacías que no están vivas. En este nivel vas a tocar solamente los seres vivos, los que respiran y crecen. ¡Aprende a ver quién tiene vida en el Pacífico!",
+                    "El manglar entero respira como un gran corazón verde, lleno de vida por todos lados. Pero no todo lo que ves está vivo: hay cosas que solo descansan quietas. En este nivel tu misión es observar bien y tocar únicamente los seres vivos. ¡Conviértete en el guardián que distingue la vida!",
                 ],
                 2: [
-                    "Cada animal tiene su comida favorita. Arrastra cada animal a la comida que come (el pez al plancton, el cangrejo a la arena, el pájaro a los frutos...). ¡La cadena de la vida es maravillosa!",
-                    "En el manglar todos comen algo distinto. Arrastra cada animal a su comida correcta y entenderás cómo se mantienen vivos. ¡Eres un biólogo del Pacífico!",
+                    "Tengo hambre... ¡y todos mis animales también! Cada criatura del manglar come algo diferente: el pez busca su plancton, el cangrejo rasca la arena y el pájaro picotea los frutos. En este nivel vas a arrastrar cada animal hasta la comida que le gusta. ¡Así descubrirás la maravillosa cadena de la vida del Pacífico!",
+                    "En el manglar hay un gran banquete y cada quien tiene su plato favorito, pero hoy todos andan confundidos buscando qué comer. En este nivel tu trabajo es unir cada animal con su alimento correcto, arrastrándolo hasta él. ¡Serás un verdadero biólogo que entiende cómo se alimenta la naturaleza!",
                 ],
                 3: [
-                    "Los animales viven en lugares diferentes: el agua, los árboles, la tierra. Arrastra cada animal a su hábitat correcto. ¡Cada quien tiene su casa en la naturaleza!",
-                    "Tu misión: poner cada criatura en el lugar donde vive. Pez al agua, mono al árbol, cangrejo a la arena. ¡Conoce los hogares del Pacífico!",
+                    "Cada criatura del Pacífico tiene su hogar: el pez vive en el agua, el mono en los árboles y el cangrejo en la arena tibia. ¡Pero hoy todos se perdieron y no encuentran su casa! En este nivel vas a arrastrar a cada animal hasta el lugar donde vive. ¡Ayúdalos a volver a casa y conocerás los rincones del manglar!",
+                    "El manglar tiene muchos hogares distintos: el agua, los árboles y la tierra húmeda. Una tormenta despistó a los animalitos y ya no saben adónde ir. En este nivel tu misión es llevar a cada criatura a su hábitat correcto. ¡Cada quien tiene su lugar en la naturaleza, y tú los guiarás!",
                 ],
                 4: [
-                    "Las plantas del Pacífico tienen partes: raíz, tallo, hojas, flor, fruto. Yo te muestro un nombre y tú tocas la parte correcta de la planta. ¡La botánica es vida!",
-                    "Mira esta planta del manglar. Yo digo el nombre de una parte y tú la encuentras. ¡Las plantas son fascinantes!",
+                    "Las plantas del manglar son sabias y tienen partes con nombres especiales: la raíz que bebe agua, el tallo que sostiene, las hojas que respiran, la flor que perfuma y el fruto que alimenta. En este nivel yo diré el nombre de una parte y tú tocarás esa parte de la planta. ¡La botánica es pura vida, y tú la vas a descubrir!",
+                    "¡Acércate a esta planta del Pacífico! Como tú, ella tiene partes que cumplen su función: raíz, tallo, hojas, flor y fruto. En este nivel te diré el nombre de una parte y tú deberás encontrarla y tocarla. ¡Las plantas son fascinantes cuando aprendes a mirarlas con cuidado!",
                 ],
                 5: [
-                    "Algunos animales del Pacífico están en peligro. Aprende sobre ellos: yo te digo un nombre y tú tocas la imagen del animal correcto. ¡Cuidar la naturaleza empieza por conocerla!",
-                    "Cada animal del Pacífico tiene su historia. Identifica cuál es cuál y aprende a proteger nuestro hogar. ¡Tú eres el guardián del futuro!",
+                    "Tengo que contarte algo importante: algunos animales del Pacífico están en peligro y necesitan que los conozcamos para poder cuidarlos. Tú puedes ser su guardián. En este nivel yo te diré el nombre de un animal y tú tocarás su imagen correcta. ¡Cuidar la naturaleza empieza por aprender quién vive en ella!",
+                    "Cada animal del Pacífico guarda una historia, y algunos están desapareciendo del manglar. Conocerlos es el primer paso para protegerlos. En este nivel deberás identificar y tocar el animal correcto según el nombre que te diga. ¡Tú eres el guardián del futuro de nuestra tierra!",
                 ],
             },
         }
@@ -830,6 +819,33 @@ def _construir_resumen_desempeno(desempeno: dict, ambito: str, nombre: str = '')
             lineas.append("TEMAS CON DIFICULTAD: ninguno (todos los temas registrados estan por encima de 70).")
 
     return '\n'.join(lineas)
+
+
+def _limpiar_historia_ia(texto: str) -> str:
+    """
+    Limpia una historia generada por IA para uso experimental:
+    - Quita markdown y etiquetas (reusa _limpiar_markdown).
+    - Elimina preambulos tipo '¡Hola, amigo! Eres X y aqui tienes una aventura'.
+    - Fusiona listas numeradas (1. 2. 3.) en texto corrido fluido.
+    """
+    import re
+    texto = _limpiar_markdown(texto)
+    # Quitar prefijos de lista numerada al inicio de cada parte: "1. ", "2) ", etc.
+    texto = re.sub(r'(?m)^\s*\d+\s*[\.\)\-]\s*', '', texto)
+    # Quitar preambulos genericos comunes del modelo
+    preambulos = [
+        r'^¡?hola[^.!?]*[.!?]\s*',
+        r'^eres\s+[^.!?]*aventura[^.!?]*[.!?]\s*',
+        r'^aqu[ií]\s+tienes[^.!?]*[.!?]\s*',
+        r'^soy\s+[^.!?]*[.!?]\s*',
+    ]
+    for p in preambulos:
+        texto = re.sub(p, '', texto, flags=re.IGNORECASE)
+    # Colapsar saltos y espacios
+    texto = re.sub(r'\s+', ' ', texto).strip()
+    # Quitar numeros sueltos al final ("... para ti. 1") o residuos
+    texto = re.sub(r'\s*\d+\s*$', '', texto).strip()
+    return texto
 
 
 def _limpiar_markdown(texto: str) -> str:
